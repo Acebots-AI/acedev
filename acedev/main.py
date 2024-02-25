@@ -13,11 +13,11 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 auth = Auth.AppAuth(
-    app_id=int(os.environ["GHE_APP_ID"]), private_key=os.environ["GHE_PRIVATE_KEY"]
+    app_id=int(os.environ["GITHUB_APP_ID"]), private_key=os.environ["GITHUB_APP_PRIVATE_KEY"]
 )
 
 ghe_client = GithubIntegration(
-    base_url=f"https://{os.environ['GHE_HOSTNAME']}", auth=auth
+    base_url=f"https://{os.environ['GITHUB_HOSTNAME']}", auth=auth
 )
 
 openai_service = OpenAIService()

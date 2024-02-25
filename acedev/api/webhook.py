@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Annotated, Any, Optional
 
 import fastapi
@@ -20,7 +21,8 @@ from acedev.utils.prompts import prompt
 router = fastapi.APIRouter()
 logger = logging.getLogger(__name__)
 
-ACEDEV_USERNAME = "acebots-ai[bot]"
+ACEBOTS_APP_USERNAME = os.getenv("GITHUB_APP_USERNAME", "acebots-ai[bot]")
+ACEDEV_USERNAME = os.getenv("GITHUB_BOT_USERNAME", "acedev-ai")
 
 
 class User(BaseModel):
@@ -138,7 +140,7 @@ def webhook(
     match x_github_event:
         case "pull_request_review_comment":
             review_comment = PullRequestReviewCommentPayload(**payload)
-            if review_comment.comment.body.startswith("@acedev") and review_comment.action in [
+            if review_comment.comment.body.startswith(f"@{ACEDEV_USERNAME}") and review_comment.action in [
                 "created",
                 "edited",
             ]:
@@ -151,7 +153,7 @@ def webhook(
         case "issue_comment":
             issue_comment = IssueCommentPayload(**payload)
 
-            if issue_comment.comment.body.startswith("@acedev") and issue_comment.action in [
+            if issue_comment.comment.body.startswith(f"@{ACEDEV_USERNAME}") and issue_comment.action in [
                 "created",
                 "edited",
             ]:
@@ -162,7 +164,7 @@ def webhook(
             if payload.get("action", None) == "assigned":
                 issue = IssueAssignedPayload(**payload)
 
-                if issue.assignee.login == "artmoskvin":
+                if issue.assignee.login == ACEDEV_USERNAME:
                     background_tasks.add_task(
                         handle_assigned_issue, issue, ghe_client, openai_agent
                     )
@@ -348,7 +350,7 @@ def _message_history_from_review_comment(
     root_comment_message = UserMessage(name=root_comment.user.login, content=comment.body)
     thread_messages = []
     for _comment in response_comments:
-        if _comment.user.login == ACEDEV_USERNAME:
+        if _comment.user.login == ACEBOTS_APP_USERNAME:
             thread_messages.append(AssistantMessage(content=_comment.body))
         else:
             thread_messages.append(UserMessage(name=_comment.user.login, content=_comment.body))
@@ -362,7 +364,7 @@ def _messages_from_pull_request(
     comments = pull_request.get_issue_comments()
     messages = []
     for comment in comments:
-        if comment.user.login == ACEDEV_USERNAME:
+        if comment.user.login == ACEBOTS_APP_USERNAME:
             messages.append(AssistantMessage(content=comment.body))
         else:
             messages.append(UserMessage(content=comment.body, name=comment.user.login))
@@ -373,7 +375,7 @@ def _messages_from_issue(issue: GithubIssue) -> list[ChatMessage]:
     comments = issue.get_comments()
     messages = []
     for comment in comments:
-        if comment.user.login == ACEDEV_USERNAME:
+        if comment.user.login == ACEBOTS_APP_USERNAME:
             messages.append(AssistantMessage(content=comment.body))
         else:
             messages.append(UserMessage(content=comment.body, name=comment.user.login))
