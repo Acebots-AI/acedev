@@ -6,7 +6,7 @@ This project is designed to seamlessly integrate with GitHub, handling GitHub ev
 
 ## Quickstart Guide
 
-1. Clone the repository: `git clone <repository-url>`
+1. Clone the repository: `git clone git@github.com:Acebots-AI/acedev.git`
 2. Install the necessary dependencies: `pip install -r requirements.txt`
 3. Set up the required environment variables by copying `.env.template` to `.env` and filling in the values.
 4. Run the application: `python acedev/main.py`
@@ -24,4 +24,3 @@ The `acedev/api/webhook.py` file contains the API for handling GitHub events. Th
 ## Contributing
 
 We welcome contributions! Please follow our contribution guidelines for submitting pull requests, reporting bugs, or suggesting enhancements.
-
