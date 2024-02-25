@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "acedev"
+version = "0.1.0"
+description = ""
+authors = ["Art Moskvin <amoskvin@me.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pydantic = "^2.5.3"
+jinja2 = "^3.1.2"
+pygithub = "^2.1.1"
+openai = "^1.6.1"
+python-dotenv = "^1.0.0"
+langchain = "^0.1.5"
+tree-sitter = "^0.20.4"
+tree-sitter-languages = "^1.10.2"
+jupyter = "^1.0.0"
+langchainhub = "^0.1.14"
+fastapi = "^0.109.2"
+uvicorn = {extras = ["standard"], version = "^0.27.0.post1"}
+litellm = "^1.23.14"
+numpydoc = "^1.6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
