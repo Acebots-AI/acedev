@@ -16,7 +16,6 @@ This project is designed to seamlessly integrate with GitHub, handling GitHub ev
 
 - **Setting Up**: Ensure you have Python and Poetry installed and clone the repository. Install dependencies as mentioned in the Quickstart Guide.
 - **Project Structure**: The project is structured around the `acedev` directory, with a focus on handling GitHub events and AI-driven interactions.
-- **Contributing**: To contribute, follow the project's coding standards, run tests before submitting pull requests, and ensure your code is well-documented.
 
 ## API Reference
 
