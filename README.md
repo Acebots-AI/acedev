@@ -7,7 +7,7 @@ This project is designed to seamlessly integrate with GitHub, handling GitHub ev
 ## Quickstart Guide
 
 1. Clone the repository: `git clone git@github.com:Acebots-AI/acedev.git`
-2. Install Poetry: `pip install poetry`
+2. Install Poetry: `pipx install poetry`
 3. Install the necessary dependencies: `poetry install`
 4. Set up the required environment variables by copying `.env.template` to `.env` and filling in the values.
 5. Run the application: `poetry run uvicorn acedev.main:main --host 0.0.0.0 --port 8000`
