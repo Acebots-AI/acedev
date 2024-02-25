@@ -21,6 +21,3 @@ This project is designed to seamlessly integrate with GitHub, handling GitHub ev
 
 The `acedev/api/webhook.py` file contains the API for handling GitHub events. This section will be expanded with detailed endpoint documentation, expected payloads, and example responses.
 
-## Contributing
-
-We welcome contributions! Please follow our contribution guidelines for submitting pull requests, reporting bugs, or suggesting enhancements.
