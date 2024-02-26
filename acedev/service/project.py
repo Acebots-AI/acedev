@@ -68,7 +68,7 @@ class Project:
             content = file.decoded_content
             return File(path=file.path, content=content.decode("utf-8"),)
         except Exception as e:
-            error_message = f"Failed to get file: {path=}"
+            error_message = f"Failed to get file {path=}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -85,7 +85,7 @@ class Project:
             )
             return git_ref.ref
         except Exception as e:
-            error_message = f"Failed to checkout new branch: {branch}"
+            error_message = f"Failed to checkout new branch {branch}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -101,7 +101,7 @@ class Project:
                 branch=branch,
             )
         except Exception as e:
-            error_message = f"Failed to update file: {file.path}"
+            error_message = f"Failed to update file {file.path}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -116,7 +116,7 @@ class Project:
                 branch=branch,
             )
         except Exception as e:
-            error_message = f"Failed to create file: {file.path}"
+            error_message = f"Failed to create file {file.path}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -138,14 +138,15 @@ class Project:
     def create_pull_request(self, title: str, body: str, branch: str) -> PullRequest:
         logger.info(f"Opening PR({title=}, {branch=})")
 
-        try:
-            for pr in self.ghe_repo.get_pulls(state="open"):
-                if pr.head.ref == branch:
-                    raise ProjectException(f"PR already exists for the {branch=}")
+        for pr in self.ghe_repo.get_pulls(state="open"):
+            if pr.head.ref == branch:
+                raise ProjectException(f"Pull request already exists for {branch=}")
 
+        try:
             pull_request = self.ghe_repo.create_pull(
                 title=title, body=body, head=branch, base=self.default_branch
             )
+
             return PullRequest(
                 title=pull_request.title,
                 body=pull_request.body,
@@ -159,7 +160,7 @@ class Project:
                 ],
             )
         except Exception as e:
-            error_message = f"Failed to open PR({title=}, {branch=})"
+            error_message = f"Failed to open Pull Request({title=}, {branch=}): {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -179,7 +180,7 @@ class Project:
                 ],
             )
         except Exception as e:
-            error_message = f"Failed to get PR: {_id=}"
+            error_message = f"Failed to get PR#{_id}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -193,7 +194,7 @@ class Project:
                 for file in pull_request.get_files()
             ]
         except Exception as e:
-            error_message = f"Failed to get PR files: {_id=}"
+            error_message = f"Failed to get PR#{_id} files: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -215,62 +216,80 @@ class Project:
         return Symbol(content=node.text.decode("utf-8"), path=path)
 
     def update_symbol_in_file(self, symbol: str, path: str, content: str, branch: str) -> None:
-        file = self.get_file(path, branch)
-        syntax_tree = self.parser.parse(file.content.encode())
-        node = find_symbol(syntax_tree.root_node, symbol)
+        current_file = self.get_file(path, branch)
+        current_tree = self.parser.parse(current_file.content.encode())
+        current_node = find_symbol(current_tree.root_node, symbol)
 
-        if not node:
+        if not current_node:
             raise ProjectException(f"Symbol {symbol} not found in {path}")
 
-        parsed_content = self.parser.parse(content.encode())
-        new_root_node = parsed_content.root_node
+        new_tree = self.parser.parse(content.encode())
+        new_root_node = new_tree.root_node
 
         if new_root_node.has_error:
-            raise ProjectException(f"Failed to parse new definition: {content}")
+            raise ProjectException(f"Failed to parse new definition for {symbol}: {content}")
 
         if new_root_node.child_count != 1:
-            raise ProjectException(f"New definition contains more (or less) than one symbol")
+            raise ProjectException(f"New definition contains {new_root_node.child_count} expressions instead of 1")
 
         new_node = new_root_node.child(0)
-        if self._node_types_match(new_node, node):
-            raise ProjectException(f"New definition is {new_node.type} instead of {node.type}")
+
+        current_node_type = self._node_type(current_node)
+        new_node_type = self._node_type(new_node)
+
+        if current_node_type != new_node_type:
+            raise ProjectException(f"New definition is {new_node_type} instead of {current_node_type}")
+
+        new_symbol_name = self._symbol_name(new_node)
+        if new_symbol_name != symbol:
+            raise ProjectException(f"New definition is for {new_symbol_name} instead of {symbol}")
 
         new_content = self._update_symbol_in_file_content(
-            file_content=file.content,
-            start_point=node.start_point,
-            end_point=node.end_point,
+            file_content=current_file.content,
+            start_point=current_node.start_point,
+            end_point=current_node.end_point,
             updated_definition=content)
 
         new_file = File(path=path, content=new_content)
         self.update_file(new_file, branch)
 
     @staticmethod
-    def _node_types_match(left: Node, right: Node) -> bool:
-        if left.type == "decorated_definition":
-            left = left.child(0)
-        if right.type == "decorated_definition":
-            right = right.child(0)
-        return left.type == right.type
+    def _node_type(node: Node) -> str:
+        if node.type == "decorated_definition":
+            return node.child(1).type
+        return node.type
+
+    @staticmethod
+    def _symbol_name(node: Node) -> str:
+        if node.type == "decorated_definition":
+            return node.child(1).child_by_field_name("name").text.decode("utf-8")
+        return node.child_by_field_name("name").text.decode("utf-8")
 
     def add_symbol(self, symbol: str, path: str, content: str, branch: str) -> None:
-        # TODO: validate symbol name
-        file = self.get_file(path, branch)
-        syntax_tree = self.parser.parse(file.content.encode())
-        node = find_symbol(syntax_tree.root_node, symbol)
+        """Naively adds a symbol to the end of the file."""
+        current_file = self.get_file(path, branch)
+        current_tree = self.parser.parse(current_file.content.encode())
+        current_node = find_symbol(current_tree.root_node, symbol)
 
-        if node:
+        if current_node:
             raise ProjectException(f"Symbol {symbol} already exists in {path}")
 
-        parsed_content = self.parser.parse(content.encode())
-        new_node = parsed_content.root_node
+        new_tree = self.parser.parse(content.encode())
+        new_root_node = new_tree.root_node
 
-        if new_node.has_error:
-            raise ProjectException(f"Failed to parse symbol definition: {content}")
+        if new_root_node.has_error:
+            raise ProjectException(f"Failed to parse {symbol} definition: {content}")
 
-        if new_node.child_count != 1:
-            raise ProjectException(f"Symbol definition contains more (or less) than one symbol")
+        if new_root_node.child_count != 1:
+            raise ProjectException(f"Symbol definition contains {new_root_node.child_count} expressions instead of 1")
 
-        new_content = file.content + "\n" + content
+        new_node = new_root_node.child(0)
+
+        new_symbol_name = self._symbol_name(new_node)
+        if new_symbol_name != symbol:
+            raise ProjectException(f"Symbol definition is for {new_symbol_name} instead of {symbol}")
+
+        new_content = current_file.content + "\n\n" + content
         new_file = File(path=path, content=new_content)
         self.update_file(new_file, branch)
 
@@ -312,23 +331,33 @@ class Project:
     def add_imports(self, import_statements: list[str], path: str, branch: str) -> None:
         """Naively adds import statements to the top of the file."""
 
-        file = self.get_file(path, branch)
-        new_imports = "\n".join(import_statements)
-        new_content = f"{new_imports}\n{file.content}"""
-        new_file = File(path=path, content=new_content)
-        self.update_file(new_file, branch)
+        try:
+            file = self.get_file(path, branch)
+            new_imports = "\n".join(import_statements)
+            new_content = f"{new_imports}\n{file.content}"""
+            new_file = File(path=path, content=new_content)
+            self.update_file(new_file, branch)
+        except Exception as e:
+            error_message = f"Failed to add imports {import_statements} to {path} in {branch}: {e}"
+            logger.exception(error_message)
+            raise ProjectException(error_message) from e
 
     def replace_imports(self, old_imports: list[str], new_imports: list[str], path: str, branch: str) -> None:
         """Naively replaces import statements in the file."""
-        file = self.get_file(path, branch)
-        new_content = file.content
-        for old_import, new_import in zip(old_imports, new_imports):
-            new_content = new_content.replace(old_import, new_import)
-        new_file = File(path=path, content=new_content)
-        self.update_file(new_file, branch)
+        try:
+            file = self.get_file(path, branch)
+            new_content = file.content
+            for old_import, new_import in zip(old_imports, new_imports):
+                new_content = new_content.replace(old_import, new_import)
+            new_file = File(path=path, content=new_content)
+            self.update_file(new_file, branch)
+        except Exception as e:
+            error_message = f"Failed to replace imports {old_imports} with {new_imports} in {path} in {branch}: {e}"
+            logger.exception(error_message)
+            raise ProjectException(error_message) from e
 
     def code_understanding_tools(self) -> dict[str, Callable[..., str]]:
-        def get_repo_map(branch: Optional[str] = None):
+        def get_project_outline(branch: Optional[str] = None):
             """
             Print project outline containing classes, functions, and files.
 
@@ -340,9 +369,12 @@ class Project:
             Returns
             -------
             str
-                Project outline.
+                Project outline or failure message.
             """
-            return self.print_repo_map(branch)
+            try:
+                return self.print_repo_map(branch)
+            except ProjectException as e:
+                return f"Failed to get project outline: {e.message}"
 
         def get_symbol(symbol: str, path: str, branch: Optional[str] = None):
             """
@@ -367,7 +399,10 @@ class Project:
             except ProjectException as e:
                 return f"Failed to get {symbol} from {path}: {e.message}"
 
-        return {get_repo_map.__name__: get_repo_map, get_symbol.__name__: get_symbol}
+        return {
+          get_project_outline.__name__: get_project_outline,
+          get_symbol.__name__: get_symbol
+        }
 
     def code_editing_tools(self) -> dict[str, Callable[..., str]]:
         def update_file(path: str, content: str, branch: str):
@@ -387,7 +422,12 @@ class Project:
             -------
             str
                 Success or failure message.
+                Returns failure message if the branch is protected (e.g. main, master).
             """
+            if branch == self.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to update {path} in {branch=}: branch is protected."
+
             try:
                 self.update_file(File(path=path, content=content), branch)
                 return f"Updated {path} in {branch}"
@@ -412,10 +452,18 @@ class Project:
             Returns
             -------
             str
-                Success or failure message. Returns failure message if the symbol is not found.
+                Success or failure message.
+                Returns failure message if the branch is protected (e.g. main, master).
+                Returns failure message if the symbol is not found.
                 Returns failure message if the new definition can not be parsed.
-                Returns failure messages if the new definition contains anything other than the symbol.
+                Returns failure messages if the new definition contains any
+                other expressions except symbol definition.
+                Returns failure message if the new definition is for another symbol.
             """
+            if branch == self.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to update {symbol} in {path} on {branch=}: branch is protected."
+
             try:
                 self.update_symbol_in_file(symbol, path, content, branch)
                 return f"Updated {symbol} in {path} on {branch=}"
@@ -439,7 +487,12 @@ class Project:
             -------
             str
                 Success or failure message.
+                Returns failure message if the branch is protected (e.g. main, master).
             """
+            if branch == self.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to create file {path} on {branch=}: branch is protected."
+
             try:
                 self.create_file(File(path=path, content=content), branch)
                 return f"Created {path} in {branch}"
@@ -507,7 +560,11 @@ class Project:
             -------
             str
                 Success or failure message.
+                Returns failure message if the branch is protected (e.g. main, master).
             """
+            if branch == self.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to add imports to {path} on {branch=}: branch is protected."
 
             try:
                 self.add_imports(import_statements, path, branch)
@@ -515,7 +572,7 @@ class Project:
             except ProjectException as e:
                 return f"Failed to add imports {import_statements} to {path} in {branch}: {e.message}"
 
-        def replace_imports(old_import_statement: list[str], new_import_statements: list[str], path, str, branch: str) -> str:
+        def replace_imports(old_import_statement: list[str], new_import_statements: list[str], path: str, branch: str) -> str:
             """
             Replace import statements in the project file.
 
@@ -534,7 +591,11 @@ class Project:
             -------
             str
                 Success or failure message.
+                Returns failure message if the branch is protected (e.g. main, master).
             """
+            if branch == self.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to replace imports {old_import_statement} with {new_import_statements} in {path} in {branch}: branch is protected."
 
             try:
                 self.replace_imports(old_import_statement, new_import_statements, path, branch)
@@ -561,7 +622,16 @@ class Project:
             -------
             str
                 Success or failure message.
+                Returns failure message if the branch is protected (e.g. main, master).
+                Returns failure message if the symbol already exists.
+                Returns failure message if the symbol definition can not be parsed.
+                Returns failure messages if the symbol definition contains any
+                other expressions except symbol definition.
+                Returns failure message if the new definition is for another symbol.
             """
+            if branch == self.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to add {symbol} to {path} in {branch}: branch is protected."
 
             try:
                 self.add_symbol(symbol, path, content, branch)

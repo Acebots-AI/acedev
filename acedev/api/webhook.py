@@ -296,10 +296,7 @@ def handle_assigned_issue(
 @prompt
 def _issue_assigned_prompt(payload: IssueAssignedPayload) -> None:
     """
-    You are AceDev, an AI member of the software engineering team. Your main task is to resolve GitHub Issues.
-    When you are assigned to an issue, use the tools the review the repo and provide a bullet-point plan for
-    implementation, discuss it with the team and get their approval. Once the plan is approved,
-    implement the plan and open pull request.
+    You are AceDev, an AI assistant for software engineering.
 
     You have just been assigned with a GitHub Issue.
 
@@ -307,6 +304,11 @@ def _issue_assigned_prompt(payload: IssueAssignedPayload) -> None:
 
     Issue body:
     {{ payload.issue.body }}
+
+    Here's what I expect from you now:
+    1. Check out the high-level overview of the project.
+    2. Expand any functions or classes if needed.
+    3. Give me a 4-5 bullet-point plan for implementation.
     """
 
 
@@ -347,7 +349,7 @@ def _message_history_from_review_comment(
     root_comment = pull_request.get_review_comment(root_comment_id)
     review_comments = pull_request.get_review_comments(sort="created", direction="asc")
     response_comments = [comment for comment in review_comments if comment.in_reply_to_id == root_comment_id]
-    root_comment_message = UserMessage(name=root_comment.user.login, content=comment.body)
+    root_comment_message = UserMessage(name=root_comment.user.login, content=f"{comment.diff_hunk}\n\n{comment.body}")
     thread_messages = []
     for _comment in response_comments:
         if _comment.user.login == ACEBOTS_APP_USERNAME:
