@@ -23,7 +23,8 @@ FILES_IGNORE = [
     ".cfg",
     "__init__.py",
     ".ini",
-    "poetry.lock"
+    "poetry.lock",
+    ".template",
 ]
 
 
@@ -74,10 +75,10 @@ class Project:
     def checkout_new_branch(self, branch: str) -> str:
         logger.info(f"Checking out new branch: {branch}")
 
-        try:
-            if branch in [branch.name for branch in self.ghe_repo.get_branches()]:
-                raise ProjectException(f"Branch already exists: {branch}")
+        if branch in [_branch.name for _branch in self.ghe_repo.get_branches()]:
+            raise ProjectException(f"Branch already exists: {branch}")
 
+        try:
             git_ref = self.ghe_repo.create_git_ref(
                 ref=f"refs/heads/{branch}",
                 sha=self.ghe_repo.get_branch(self.default_branch).commit.sha,
@@ -569,7 +570,7 @@ class Project:
                 return f"Failed to add {symbol} to {path} in {branch}: {e.message}"
 
         return {
-            # update_file.__name__: update_file,
+            update_file.__name__: update_file,
             update_symbol.__name__: update_symbol,
             create_file.__name__: create_file,
             checkout_new_branch.__name__: checkout_new_branch,

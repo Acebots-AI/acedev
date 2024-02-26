@@ -10,6 +10,8 @@ from acedev.service.openai_service import OpenAIService
 
 logging.basicConfig(level=logging.INFO)
 
+logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+
 load_dotenv()
 
 auth = Auth.AppAuth(
