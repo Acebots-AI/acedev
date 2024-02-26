@@ -640,7 +640,7 @@ class Project:
                 return f"Failed to add {symbol} to {path} in {branch}: {e.message}"
 
         return {
-            update_file.__name__: update_file,
+            # update_file.__name__: update_file,
             update_symbol.__name__: update_symbol,
             create_file.__name__: create_file,
             checkout_new_branch.__name__: checkout_new_branch,
