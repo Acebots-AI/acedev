@@ -10,6 +10,7 @@ FUNC_CAPTURE = 'func'
 IMPORT_CAPTURE = 'import'
 EXPRESSION_CAPTURE = 'expression'
 
+
 def print_capture(node: Node, capture_name: str) -> str:
     result = ""
 
@@ -46,6 +47,7 @@ def print_capture(node: Node, capture_name: str) -> str:
 
     return result
 
+
 def map_code(ast: Tree, language: Language) -> str:
     pattern = f"""
     (import_statement) @{IMPORT_CAPTURE}
@@ -63,6 +65,7 @@ def map_code(ast: Tree, language: Language) -> str:
         result += print_capture(node, capture_name)
 
     return result
+
 
 def find_symbol(node: Node, symbol: str) -> Optional[Node]:
     """
@@ -86,16 +89,3 @@ def find_symbol(node: Node, symbol: str) -> Optional[Node]:
         result = find_symbol(child, symbol)
         if result:
             return result
-
-
-if __name__ == "__main__":
-    from tree_sitter_languages import get_language, get_parser
-
-    language = get_language('python')
-    parser = get_parser('python')
-
-    with open("coding.py", "r") as file:
-        source_code = file.read()
-
-    tree = parser.parse(bytes(source_code, "utf8"))
-    print(map_code(tree, language))

@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterator, Sequence, Callable
 
-from acedev.service.agent import Agent
+from acedev.agent import Agent
 from acedev.service.model import AgentCompletionRequest, ChatMessage, ToolMessage, AssistantMessage
 from acedev.service.openai_service import OpenAIService
 

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from typing_extensions import Sequence
 
 from acedev.api.dependencies import get_ghe_client, get_openai_agent
-from acedev.service.agent.openai_agent import OpenAIAgent
+from acedev.agent import OpenAIAgent
 from acedev.service.model import ChatMessage, AgentCompletionRequest, AgentCompletionContext, AssistantMessage, \
     FileChange, \
     SystemMessage, UserMessage, PullRequest as mPullRequest

@@ -1,5 +1,4 @@
 import json
-from enum import Enum
 from typing import Sequence, Any, Optional
 
 from litellm.utils import ChatCompletionMessageToolCall
@@ -25,37 +24,6 @@ class PullRequest(BaseModel):
     head_ref: str
     url: str
     files: Sequence[FileChange]
-
-
-class Action(str, Enum):
-    UPDATE = "update"
-    CREATE = "create"
-    DELETE = "delete"
-
-
-class FileAction(BaseModel):
-    action: Action
-    file: File
-
-
-class CreatePullRequestResponse(BaseModel):
-    actions: Sequence[FileAction] = Field(description="Files to update")
-    branch: str = Field(description="Name of the branch to create")
-    title: str = Field(description="Title of the pull request")
-    body: str = Field(description="Body of the pull request")
-
-
-class UpdatePullRequestResponse(BaseModel):
-    actions: Sequence[FileAction] = Field(description="Files to update")
-
-
-class SymbolLookup(BaseModel):
-    symbol: str = Field(description="Name of the symbol, e.g. function, class or method, to look up")
-    path: str = Field(description="Path to the project file containing the symbol")
-
-
-class SymbolLookupPlan(BaseModel):
-    lookups: Sequence[SymbolLookup] = Field(description="Symbol lookups")
 
 
 class Symbol(BaseModel):
@@ -207,14 +175,3 @@ class AgentCompletionContext(BaseModel):
 class AgentCompletionRequest(BaseModel):
     messages: list[ChatMessage]
     context: AgentCompletionContext
-
-
-class AgentAction(BaseModel):
-    tool: str
-    tool_input: dict
-    log: str
-    messages: Sequence[str]
-
-
-class AgentObservation(BaseModel):
-    observation: str
