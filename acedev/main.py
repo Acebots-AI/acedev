@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from github import Auth, GithubIntegration
 
 from acedev.api.api import get_api
-from acedev.agent import OpenAIAgent
+from acedev.agent.openai_agent import OpenAIAgent
 from acedev.service.openai_service import OpenAIService
 
 logging.basicConfig(level=logging.INFO)

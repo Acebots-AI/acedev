@@ -4,7 +4,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from acedev.api import webhook, root
 from acedev.api.settings import ApiSettings
-from acedev.agent import OpenAIAgent
+from acedev.agent.openai_agent import OpenAIAgent
 from acedev.service.openai_service import OpenAIService
 
 

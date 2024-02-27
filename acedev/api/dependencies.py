@@ -2,7 +2,7 @@ from github import GithubIntegration
 from starlette.requests import Request
 
 from acedev.api.settings import ApiSettings
-from acedev.agent import OpenAIAgent
+from acedev.agent.openai_agent import OpenAIAgent
 from acedev.service.openai_service import OpenAIService
 
 
