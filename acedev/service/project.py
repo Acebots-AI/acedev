@@ -25,6 +25,8 @@ FILES_IGNORE = [
     ".ini",
     "poetry.lock",
     ".template",
+    ".conf",
+    ".xml",
 ]
 
 
@@ -32,7 +34,8 @@ class Project:
     def __init__(self, ghe_repo: Repository) -> None:
         self.ghe_repo = ghe_repo
         self.default_branch = ghe_repo.default_branch
-        repo_language = ghe_repo.language.lower()
+        repo_language = (ghe_repo.language or
+                         max(ghe_repo.get_languages(), key=ghe_repo.get_languages().get)).lower()
         self.language = get_language(repo_language)
         self.parser = get_parser(repo_language)
 
@@ -44,6 +47,9 @@ class Project:
     ) -> Generator[File, None, None]:
         try:
             for file in self.ghe_repo.get_contents(path, branch or self.default_branch):  # type: ignore[union-attr]
+                if file.name.startswith("."):
+                    continue
+
                 # TODO: handle images and other non-textual files
                 if any(pattern in file.name for pattern in FILES_IGNORE):
                     continue
@@ -58,7 +64,7 @@ class Project:
                 content = file.decoded_content
                 yield File(path=file.path, content=content.decode("utf-8"),)
         except Exception as e:
-            error_message = f"Failed to get files for {path=} and {branch=}"
+            error_message = f"Failed to get files for {path=} and {branch=}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
 
@@ -75,7 +81,7 @@ class Project:
     def checkout_new_branch(self, branch: str) -> str:
         logger.info(f"Checking out new branch: {branch}")
 
-        if branch in [_branch.name for _branch in self.ghe_repo.get_branches()]:
+        if self.branch_exists(branch):
             raise ProjectException(f"Branch already exists: {branch}")
 
         try:
@@ -88,6 +94,10 @@ class Project:
             error_message = f"Failed to checkout new branch {branch}: {e}"
             logger.exception(error_message)
             raise ProjectException(error_message) from e
+
+    def branch_exists(self, branch: str) -> bool:
+        return branch in [_branch.name for _branch in
+                          self.ghe_repo.get_branches()]
 
     def update_file(self, file: File, branch: str) -> None:
         logger.info(f"Updating file: {file.path}")
@@ -199,6 +209,8 @@ class Project:
             raise ProjectException(error_message) from e
 
     def print_repo_map(self, branch: Optional[str] = None) -> str:
+        if branch and not self.branch_exists(branch):
+            raise ProjectException(f"Branch {branch} does not exist")
         repo_map = ""
         for file in self.get_files(branch=branch):
             syntax_tree = self.parser.parse(file.content.encode())
@@ -357,6 +369,17 @@ class Project:
             raise ProjectException(error_message) from e
 
     def code_understanding_tools(self) -> dict[str, Callable[..., str]]:
+        def get_default_branch():
+            """
+            Get the default branch of the project.
+
+            Returns
+            -------
+            str
+                Default branch of the project.
+            """
+            return self.default_branch
+
         def get_project_outline(branch: Optional[str] = None):
             """
             Print project outline containing classes, functions, and files.
@@ -400,6 +423,7 @@ class Project:
                 return f"Failed to get {symbol} from {path}: {e.message}"
 
         return {
+          get_default_branch.__name__: get_default_branch,
           get_project_outline.__name__: get_project_outline,
           get_symbol.__name__: get_symbol
         }
