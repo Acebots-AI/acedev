@@ -2,9 +2,9 @@ import fastapi
 from github import GithubIntegration
 from starlette.middleware.cors import CORSMiddleware
 
-from acedev.api import agent, webhook, root
+from acedev.api import webhook, root
 from acedev.api.settings import ApiSettings
-from acedev.service.agent.openai_agent import OpenAIAgent
+from acedev.agent import OpenAIAgent
 from acedev.service.openai_service import OpenAIService
 
 
@@ -55,8 +55,6 @@ def get_api(
 
     # Register the paths in the root router on the API.
     api.include_router(root.router)
-    api.include_router(agent.router, prefix="/v1/agent")
-    # api.include_router(pull_request.router, prefix="/v1/pull_request")
     api.include_router(webhook.router, prefix="/v1")
 
     # define_exception_handlers(api)

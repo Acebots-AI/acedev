@@ -6,7 +6,7 @@ from tree_sitter import Node
 from tree_sitter_languages import get_language, get_parser
 
 from acedev.service.model import File, FileChange, PullRequest, Symbol
-from acedev.service.parsing import map_code, find_symbol
+from acedev.utils.parsing import map_code, find_symbol
 
 logger = logging.getLogger(__name__)
 
