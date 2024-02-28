@@ -2,16 +2,18 @@ import fastapi
 from github import GithubIntegration
 from starlette.middleware.cors import CORSMiddleware
 
+from acedev.agent.github_agent_factory import GitHubAgentFactory
 from acedev.api import webhook, root
 from acedev.api.settings import ApiSettings
-from acedev.agent.openai_agent import OpenAIAgent
+from acedev.agent.openai_agent_runner import OpenAIAgentRunner
 from acedev.service.openai_service import OpenAIService
 
 
 def get_api(
     ghe_client: GithubIntegration,
     openai_service: OpenAIService,
-    openai_agent: OpenAIAgent,
+    openai_agent: OpenAIAgentRunner,
+    github_agent_factory: GitHubAgentFactory,
 ) -> fastapi.FastAPI:
     """Create and set up the API.
 
@@ -41,6 +43,7 @@ def get_api(
     api.state.ghe_client = ghe_client
     api.state.openai_service = openai_service
     api.state.openai_agent = openai_agent
+    api.state.github_agent_factory = github_agent_factory
 
     # Add CORS middleware, almost required if the API is to be used from a
     # browser. The CORS origins are configured in the settings.

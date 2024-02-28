@@ -1,6 +1,8 @@
 import json
 from typing import Sequence, Any, Optional
 
+from github.PullRequest import PullRequest as GitHubPullRequest
+from github.PullRequestComment import PullRequestComment
 from litellm.utils import ChatCompletionMessageToolCall
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -24,6 +26,55 @@ class PullRequest(BaseModel):
     head_ref: str
     url: str
     files: Sequence[FileChange]
+
+    @staticmethod
+    def from_github(pull_request: GitHubPullRequest):
+        return PullRequest(
+            title=pull_request.title,
+            body=pull_request.body,
+            head_ref=pull_request.head.ref,
+            url=pull_request.html_url,
+            files=[
+                FileChange(
+                    status=file.status, filename=file.filename, diff=file.patch
+                )
+                for file in pull_request.get_files()
+            ],
+        )
+
+
+class PullRequestReviewComment(BaseModel):
+    id: int
+    user: str
+    body: str
+    diff_hunk: str
+
+    @classmethod
+    def from_github(cls, comment: PullRequestComment) -> "PullRequestReviewComment":
+        return PullRequestReviewComment(
+            id=comment.id,
+            user=comment.user.login,
+            body=comment.body,
+            diff_hunk=comment.diff_hunk
+        )
+
+
+class PullRequestReviewThread(BaseModel):
+    diff_hunk: str
+    comments: list[PullRequestReviewComment]
+
+
+class IssueComment(BaseModel):
+    user: str
+    body: str
+
+
+class Issue(BaseModel):
+    id: int
+    number: int
+    title: str
+    body: str
+    comments: Sequence[IssueComment]
 
 
 class Symbol(BaseModel):
@@ -174,4 +225,4 @@ class AgentCompletionContext(BaseModel):
 
 class AgentCompletionRequest(BaseModel):
     messages: list[ChatMessage]
-    context: AgentCompletionContext
+    # context: AgentCompletionContext

@@ -121,6 +121,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env*
+!.env.template
 .venv
 env/
 venv/
@@ -166,3 +168,7 @@ pyrightconfig.json
 
 # Sandbox
 .sandbox/
+
+
+# VS Code
+.vscode/
