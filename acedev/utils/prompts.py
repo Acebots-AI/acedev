@@ -96,4 +96,4 @@ def render(template: str, **values: Optional[Dict[str, Any]]) -> str:
 
     jinja_template = env.from_string(cleaned_template)
 
-    return jinja_template.render(**values)
+    return jinja_template.render(**values).rstrip()

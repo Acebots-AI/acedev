@@ -5,23 +5,21 @@ from typing import Annotated, Any, Optional
 import fastapi
 from fastapi import BackgroundTasks, Body, Depends, Header
 from github import GithubIntegration
-from github.Issue import Issue as GithubIssue
-from github.PullRequest import PullRequest as GithubPullRequest
 from pydantic import BaseModel
-from typing_extensions import Sequence
 
-from acedev.api.dependencies import get_ghe_client, get_openai_agent
-from acedev.agent.openai_agent import OpenAIAgent
-from acedev.service.model import ChatMessage, AgentCompletionRequest, AgentCompletionContext, AssistantMessage, \
-    FileChange, \
-    SystemMessage, UserMessage, PullRequest as mPullRequest
-from acedev.service.project import Project
-from acedev.utils.prompts import prompt
+from acedev.agent.github_agent_factory import GitHubAgentFactory
+from acedev.agent.openai_agent_runner import OpenAIAgentRunner
+from acedev.api.dependencies import (
+    get_ghe_client,
+    get_openai_agent,
+    get_github_agent_factory,
+)
+from acedev.service.github_service import GitHubService
+from acedev.service.gitrepository import GitRepository
 
 router = fastapi.APIRouter()
 logger = logging.getLogger(__name__)
 
-ACEBOTS_APP_USERNAME = os.getenv("GITHUB_APP_USERNAME", "acebots-ai[bot]")
 ACEDEV_USERNAME = os.getenv("GITHUB_BOT_USERNAME", "acedev-ai")
 
 
@@ -128,11 +126,12 @@ class IssueAssignedPayload(BaseModel):
     responses={"202": {"description": "Event accepted"}},
 )
 def webhook(
-        x_github_event: Annotated[str, Header()],
-        payload: Annotated[dict[Any, Any], Body()],
-        background_tasks: BackgroundTasks,
-        ghe_client: GithubIntegration = Depends(get_ghe_client),
-        openai_agent: OpenAIAgent = Depends(get_openai_agent),
+    x_github_event: Annotated[str, Header()],
+    payload: Annotated[dict[Any, Any], Body()],
+    background_tasks: BackgroundTasks,
+    ghe_client: GithubIntegration = Depends(get_ghe_client),
+    openai_agent: OpenAIAgentRunner = Depends(get_openai_agent),
+    github_agent_factory: GitHubAgentFactory = Depends(get_github_agent_factory),
 ) -> fastapi.Response:
     logger.info(f"Received {x_github_event=}")
     logger.debug(f"{payload=}")
@@ -140,7 +139,9 @@ def webhook(
     match x_github_event:
         case "pull_request_review_comment":
             review_comment = PullRequestReviewCommentPayload(**payload)
-            if review_comment.comment.body.startswith(f"@{ACEDEV_USERNAME}") and review_comment.action in [
+            if review_comment.comment.body.startswith(
+                f"@{ACEDEV_USERNAME}"
+            ) and review_comment.action in [
                 "created",
                 "edited",
             ]:
@@ -148,17 +149,24 @@ def webhook(
                     handle_pull_request_review_comment,
                     review_comment,
                     ghe_client,
-                    openai_agent
+                    openai_agent,
+                    github_agent_factory,
                 )
         case "issue_comment":
             issue_comment = IssueCommentPayload(**payload)
 
-            if issue_comment.comment.body.startswith(f"@{ACEDEV_USERNAME}") and issue_comment.action in [
+            if issue_comment.comment.body.startswith(
+                f"@{ACEDEV_USERNAME}"
+            ) and issue_comment.action in [
                 "created",
                 "edited",
             ]:
                 background_tasks.add_task(
-                    handle_issue_comment, issue_comment, ghe_client, openai_agent
+                    handle_issue_comment,
+                    issue_comment,
+                    ghe_client,
+                    openai_agent,
+                    github_agent_factory,
                 )
         case "issues":
             if payload.get("action", None) == "assigned":
@@ -166,7 +174,11 @@ def webhook(
 
                 if issue.assignee.login == ACEDEV_USERNAME:
                     background_tasks.add_task(
-                        handle_assigned_issue, issue, ghe_client, openai_agent
+                        handle_assigned_issue,
+                        issue,
+                        ghe_client,
+                        openai_agent,
+                        github_agent_factory,
                     )
         case _:
             logger.warning(f"Unexpected event: {x_github_event}")
@@ -175,210 +187,73 @@ def webhook(
 
 
 def handle_pull_request_review_comment(
-        payload: PullRequestReviewCommentPayload,
-        ghe_client: GithubIntegration,
-        openai_agent: OpenAIAgent,
+    payload: PullRequestReviewCommentPayload,
+    github_client: GithubIntegration,
+    openai_agent: OpenAIAgentRunner,
+    github_agent_factory: GitHubAgentFactory,
 ) -> None:
     try:
-        repo = ghe_client.get_github_for_installation(
+        github_repo = github_client.get_github_for_installation(
             payload.installation.id
         ).get_repo(payload.repository.full_name)
-        project = Project(repo)
-        pull_request_number = payload.pull_request.number
-        pull_request = repo.get_pull(pull_request_number)
-        pull_request_files = project.get_pull_request_files(pull_request_number)
-        messages: list[ChatMessage] = [SystemMessage(
-            content=_pull_request_review_comment_prompt(project.get_pull_request(pull_request_number),
-                                                        pull_request_files))]
-        messages.extend(_message_history_from_review_comment(payload.comment, pull_request))
 
-        logger.info(
-            f"Replying to PR comment for PR#{pull_request_number} in {repo.full_name}. Current thread: \n{messages}"
+        github_agent = github_agent_factory.create(
+            git_repo=GitRepository(github_repo),
+            github_service=GitHubService(github_repo),
+            agent_runner=openai_agent,
         )
 
-        completion_request = AgentCompletionRequest(
-            messages=messages,
-            context=AgentCompletionContext(repo=repo.full_name, owner=repo.owner.login))
-
-        tools = {**project.code_understanding_tools(), **project.code_editing_tools()}
-
-        for message in openai_agent.run(completion_request, tools):
-            logger.info(f"\nMessage from agent:\n{message}")
-            if isinstance(message, AssistantMessage) and message.content:
-                pull_request.create_review_comment_reply(
-                    comment_id=payload.comment.in_reply_to_id or payload.comment.id,
-                    body=message.content,
-                )
+        github_agent.handle_pull_request_review_comment(
+            comment_id=payload.comment.id,
+            pull_request_number=payload.pull_request.number,
+        )
     except Exception:
-        logger.exception(
-            f"Failed to handle pull request review comment: {payload=}"
-        )
+        logger.exception(f"Failed to handle pull request review comment: {payload=}")
 
 
 def handle_issue_comment(
-        payload: IssueCommentPayload,
-        ghe_client: GithubIntegration,
-        openai_agent: OpenAIAgent,
+    payload: IssueCommentPayload,
+    github_client: GithubIntegration,
+    openai_agent: OpenAIAgentRunner,
+    github_agent_factory: GitHubAgentFactory,
 ) -> None:
     try:
-        repo = ghe_client.get_github_for_installation(
+        github_repo = github_client.get_github_for_installation(
             payload.installation.id
         ).get_repo(payload.repository.full_name)
 
-        project = Project(repo)
-        issue = repo.get_issue(payload.issue.number)
-        messages: list[ChatMessage] = []
-
-        if payload.issue.pull_request:
-            pull_request_number = payload.issue.number
-            pull_request = repo.get_pull(pull_request_number)
-            pull_request_files = project.get_pull_request_files(pull_request_number)
-            messages.append(SystemMessage(
-                content=_pull_request_review_comment_prompt(project.get_pull_request(pull_request_number),
-                                                            pull_request_files)))
-            messages.extend(_messages_from_pull_request(pull_request))
-        else:
-            messages.append(SystemMessage(content=_issue_assigned_prompt(payload)))
-            messages.extend(_messages_from_issue(issue))
-
-        logger.info(
-            f"Replying to Issue#{payload.issue.number} in {repo.full_name}. Message history: \n{messages}"
+        github_agent = github_agent_factory.create(
+            git_repo=GitRepository(github_repo),
+            github_service=GitHubService(github_repo),
+            agent_runner=openai_agent,
         )
 
-        completion_request = AgentCompletionRequest(
-            messages=messages,
-            context=AgentCompletionContext(repo=repo.full_name, owner=repo.owner.login))
-
-        tools = {**project.code_understanding_tools(), **project.code_editing_tools()}
-
-        for message in openai_agent.run(completion_request, tools):
-            logger.info(f"\nMessage from agent:\n{message}")
-            if isinstance(message, AssistantMessage) and message.content:
-                issue.create_comment(
-                    body=message.content
-                )
+        github_agent.handle_issue_comment(
+            issue_number=payload.issue.number,
+        )
     except Exception:
         logger.exception(f"Failed to handle issue comment: {payload=}")
 
 
 def handle_assigned_issue(
-        payload: IssueAssignedPayload,
-        ghe_client: GithubIntegration,
-        openai_agent: OpenAIAgent,
+    payload: IssueAssignedPayload,
+    github_client: GithubIntegration,
+    openai_agent: OpenAIAgentRunner,
+    github_agent_factory: GitHubAgentFactory,
 ) -> None:
     try:
-        repo = ghe_client.get_github_for_installation(
+        github_repo = github_client.get_github_for_installation(
             payload.installation.id
         ).get_repo(payload.repository.full_name)
-        project = Project(repo)
-        issue = repo.get_issue(payload.issue.number)
 
-        messages = [SystemMessage(content=_issue_assigned_prompt(payload))] + _messages_from_issue(issue)
-
-        logger.info(
-            f"Handling assigned issue#{payload.issue.number} in {repo.full_name}. Messages: \n{messages}"
+        github_agent = github_agent_factory.create(
+            git_repo=GitRepository(github_repo),
+            github_service=GitHubService(github_repo),
+            agent_runner=openai_agent,
         )
 
-        completion_request = AgentCompletionRequest(
-            messages=messages,
-            context=AgentCompletionContext(repo=repo.full_name, owner=repo.owner.login))
-
-        for message in openai_agent.run(completion_request, project.code_understanding_tools()):
-            logger.info(f"\nMessage from agent:\n{message}")
-            if isinstance(message, AssistantMessage) and message.content:
-                issue.create_comment(
-                    body=message.content
-                )
+        github_agent.handle_issue_assignment(
+            issue_number=payload.issue.number,
+        )
     except Exception:
         logger.exception(f"Failed to handle assigned issue: {payload=}")
-
-
-@prompt
-def _issue_assigned_prompt(payload: IssueAssignedPayload) -> None:
-    """
-    You are AceDev, an AI assistant for software engineering.
-
-    You have just been assigned with a GitHub Issue.
-
-    Issue title: {{ payload.issue.title }}
-
-    Issue body:
-    {{ payload.issue.body }}
-
-    Here's what I expect from you now:
-    1. Check out the high-level overview of the project.
-    2. Expand any functions or classes if needed.
-    3. Give me a 4-5 bullet-point plan for implementation.
-    """
-
-
-@prompt
-def _pull_request_review_comment_prompt(pull_request: mPullRequest, files: Sequence[FileChange]) -> None:
-    """
-    You are AceDev, an AI member of the software engineering team. You have opened a pull
-    request and are waiting for a review. When a review comment is posted, you should reply
-    to the comment and update the code if needed. You should also
-    ask for clarification if you don't understand the comment.
-
-    Pull request title: {{ pull_request.title }}
-
-    Pull request branch: {{ pull_request.head_ref }}
-
-    Pull request body:
-    {{ pull_request.body }}
-
-    Pull request files:
-    {% for file in files %}
-    {{ file.status }} {{ file.filename }}
-    ```diff
-    {{ file.diff }}
-    ```
-    {% endfor %}
-    """
-
-
-# TODO: move to Project
-def _message_history_from_review_comment(
-        comment: PullRequestReviewComment,
-        pull_request: GithubPullRequest
-) -> Sequence[ChatMessage]:
-    if comment.in_reply_to_id is None:
-        return [UserMessage(name=comment.user.login, content=comment.body)]
-
-    root_comment_id = comment.in_reply_to_id
-    root_comment = pull_request.get_review_comment(root_comment_id)
-    review_comments = pull_request.get_review_comments(sort="created", direction="asc")
-    response_comments = [comment for comment in review_comments if comment.in_reply_to_id == root_comment_id]
-    root_comment_message = UserMessage(name=root_comment.user.login, content=f"{comment.diff_hunk}\n\n{comment.body}")
-    thread_messages = []
-    for _comment in response_comments:
-        if _comment.user.login == ACEBOTS_APP_USERNAME:
-            thread_messages.append(AssistantMessage(content=_comment.body))
-        else:
-            thread_messages.append(UserMessage(name=_comment.user.login, content=_comment.body))
-    return [root_comment_message] + thread_messages
-
-
-# TODO: move to Project
-def _messages_from_pull_request(
-        pull_request: GithubPullRequest
-) -> list[ChatMessage]:
-    comments = pull_request.get_issue_comments()
-    messages = []
-    for comment in comments:
-        if comment.user.login == ACEBOTS_APP_USERNAME:
-            messages.append(AssistantMessage(content=comment.body))
-        else:
-            messages.append(UserMessage(content=comment.body, name=comment.user.login))
-    return messages
-
-
-def _messages_from_issue(issue: GithubIssue) -> list[ChatMessage]:
-    comments = issue.get_comments()
-    messages = []
-    for comment in comments:
-        if comment.user.login == ACEBOTS_APP_USERNAME:
-            messages.append(AssistantMessage(content=comment.body))
-        else:
-            messages.append(UserMessage(content=comment.body, name=comment.user.login))
-    return messages
