@@ -99,10 +99,10 @@ def test_handle_pull_request_review_comment(
             diff_hunk=DIFF_HUNK,
             comments=[
                 PullRequestReviewComment(
-                    id=ROOT_COMMENT_ID, user=USERNAME, body=COMMENT_BODY
+                    id=ROOT_COMMENT_ID, user=USERNAME, body=COMMENT_BODY, diff_hunk=DIFF_HUNK
                 ),
                 PullRequestReviewComment(
-                    id=COMMENT_ID, user=ACEBOTS_APP_USERNAME, body=COMMENT_BODY_1
+                    id=COMMENT_ID, user=ACEBOTS_APP_USERNAME, body=COMMENT_BODY_1, diff_hunk=DIFF_HUNK
                 ),
             ],
         )
