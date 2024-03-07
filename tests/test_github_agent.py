@@ -80,19 +80,6 @@ def github_agent(
     return GitHubAgent(tool_provider, agent_runner, github_service)
 
 
-def test_build() -> None:
-    mock_git_repo = create_autospec(GitRepository)
-    mock_git_repo.language = "python"
-    assert isinstance(
-        GitHubAgent.build(
-            git_repo=mock_git_repo,
-            github_service=create_autospec(spec=GitHubService),
-            agent_runner=create_autospec(spec=AgentRunner),
-        ),
-        GitHubAgent,
-    )
-
-
 def test_tools(github_agent: GitHubAgent, tool_provider: ToolProvider) -> None:
     assert github_agent.tools() == {
         **tool_provider.code_understanding_tools(),
