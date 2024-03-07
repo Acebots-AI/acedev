@@ -145,8 +145,7 @@ def my_func(param1: str, param2: int) -> None:
 def test_get_symbol_not_found(
     symbol_manipulator: SymbolManipulator, file2: File
 ) -> None:
-    with pytest.raises(SymbolManipulatorException):
-        symbol_manipulator.get_symbol("non_existing_symbol", file2)
+    assert symbol_manipulator.get_symbol("non_existing_symbol", file2) is None
 
 
 def test_update_symbol_in_file_function(

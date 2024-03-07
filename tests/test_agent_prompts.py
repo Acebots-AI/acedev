@@ -52,7 +52,14 @@ Pull request files:
 {STATUS} {FILENAME}
 ```diff
 {DIFF}
-```\
+```
+
+Here's what I expect from you now:
+1. Check out the high-level overview of the project.
+2. Expand any functions or classes if needed.
+3. Apply the changes suggested in the review comment.
+
+Keep in mind that you don't have the local repository. Instead, you interact with the remote via GitHub API.\
 """
 
 
@@ -78,5 +85,7 @@ Issue body:
 Here's what I expect from you now:
 1. Check out the high-level overview of the project.
 2. Expand any functions or classes if needed.
-3. Give me a 4-5 bullet-point plan for implementation.\
+3. Give me a 4-5 bullet-point plan for implementation. Be specific and include any relevant code snippets.
+
+Keep in mind that you don't have the local repository. Instead, you interact with the remote via GitHub API.\
 """

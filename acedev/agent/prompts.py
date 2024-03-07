@@ -24,7 +24,7 @@ def pull_request_review_comment_prompt(pull_request: PullRequest) -> None:
     {{ file.diff }}
     ```
 
-    {% endfor %}
+    {% endfor -%}
 
     Here's what I expect from you now:
     1. Check out the high-level overview of the project.
