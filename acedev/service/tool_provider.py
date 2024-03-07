@@ -26,12 +26,12 @@ class ToolProvider:
 
     def get_project_outline(self, branch: Optional[str] = None):
         """
-        Print project outline containing classes, functions, and files.
+        Fetches the files from the remote branch and prints the outline that contains truncated content of each file.
 
         Parameters
         ----------
         branch : str, optional
-            Name of the branch. Default is the default branch.
+            Name of the remote branch. Default is the default branch.
 
         Returns
         -------
@@ -50,7 +50,7 @@ class ToolProvider:
 
     def get_symbol(self, symbol: str, path: str, branch: Optional[str] = None):
         """
-        Expand the symbol e.g. function, class or method from the project file.
+        Expand the symbol e.g. function, class or method from the project file of the remote repo.
 
         Parameters
         ----------
@@ -59,29 +59,72 @@ class ToolProvider:
         path : str
             Path to the project file containing the symbol.
         branch : str, optional
-            Name of the branch. Default is the default branch.
+            Name of the remote branch. Default is the default branch.
 
         Returns
         -------
         str
             Expanded symbol or failure message.
             Returns failure message if the branch does not exist.
+            Returns failure message if the path does not exist.
+            Returns failure message if the symbol does not exist.
         """
         try:
             if branch and not self.git_repository.branch_exists(branch):
                 return f"Failed to get {symbol} from {path}: {branch=} does not exist."
 
             file = self.git_repository.get_file(path=path, branch=branch or self.git_repository.default_branch)
-            return self.symbol_manipulator.get_symbol(symbol=symbol, file=file).content
+
+            if not file:
+                return f"Failed to get {symbol} from {path}: {path=} does not exist."
+
+            symbol = self.symbol_manipulator.get_symbol(symbol=symbol, file=file)
+
+            if not symbol:
+                return f"Failed to get {symbol} from {path}: {symbol=} does not exist."
+
+            return symbol.content
         except (GitRepositoryException, SymbolManipulatorException) as e:
             return f"Failed to get {symbol} from {path}: {e.message}"
+
+    def get_file(self, path: str, branch: Optional[str] = None):
+        """
+        Get the file from the remote repo.
+
+        Parameters
+        ----------
+        path : str
+            Path to the file.
+        branch : str, optional
+            Name of the remote branch. Default is the default branch.
+
+        Returns
+        -------
+        str
+            Content of the file or failure message.
+            Returns failure message if the branch does not exist.
+            Returns failure message if the path does not exist.
+        """
+        try:
+            if branch and not self.git_repository.branch_exists(branch):
+                return f"Failed to get {path}: {branch=} does not exist."
+
+            file = self.git_repository.get_file(path=path, branch=branch or self.git_repository.default_branch)
+
+            if not file:
+                return f"Failed to get {path}: path does not exist."
+
+            return file.content
+        except GitRepositoryException as e:
+            return f"Failed to get {path}: {e.message}"
 
     def code_understanding_tools(self) -> dict[str, Callable[..., str]]:
 
         return {
             self.get_default_branch.__name__: self.get_default_branch,
             self.get_project_outline.__name__: self.get_project_outline,
-            self.get_symbol.__name__: self.get_symbol
+            self.get_symbol.__name__: self.get_symbol,
+            self.get_file.__name__: self.get_file
         }
 
     def code_editing_tools(self) -> dict[str, Callable[..., str]]:
@@ -119,7 +162,8 @@ class ToolProvider:
 
         def update_symbol(symbol: str, path: str, content: str, branch: str):
             """
-            Update the symbol, e.g. function, class or method in the project file.
+            Update the symbol in the project file of the remote repo.
+            Currently, we support symbols like function, class and method.
 
             Parameters
             ----------
@@ -130,7 +174,7 @@ class ToolProvider:
             content : str
                 New definition of the symbol.
             branch : str
-                Name of the branch.
+                Name of the remote branch.
 
             Returns
             -------
@@ -138,6 +182,7 @@ class ToolProvider:
                 Success or failure message.
                 Returns failure message if the branch is protected (e.g. main, master).
                 Returns failure message if the symbol is not found.
+                Returns failure message if the path does not exist.
                 Returns failure message if the new definition can not be parsed.
                 Returns failure messages if the new definition contains any
                 other expressions except symbol definition.
@@ -152,6 +197,10 @@ class ToolProvider:
                     return f"Failed to update {symbol} in {path}: {branch=} does not exist."
 
                 file = self.git_repository.get_file(path=path, branch=branch)
+
+                if not file:
+                    return f"Failed to update {symbol} in {path}: path does not exist."
+
                 new_file = self.symbol_manipulator.update_symbol(symbol=symbol, content=content, file=file)
                 self.git_repository.update_file(file=new_file, branch=branch)
                 return f"Updated {symbol} in {path} on {branch=}"
@@ -160,7 +209,7 @@ class ToolProvider:
 
         def create_file(path: str, content: str, branch: str):
             """
-            Create the file in the branch.
+            Create the file in the remote branch.
 
             Parameters
             ----------
@@ -169,13 +218,14 @@ class ToolProvider:
             content : str
                 New content of the file.
             branch : str
-                Name of the branch.
+                Name of the remote branch.
 
             Returns
             -------
             str
                 Success or failure message.
                 Returns failure message if the branch is protected (e.g. main, master).
+                Returns failure message if the file already exists.
             """
 
             try:
@@ -186,6 +236,9 @@ class ToolProvider:
                 if not self.git_repository.branch_exists(branch):
                     return f"Failed to create {path}: {branch=} does not exist."
 
+                if self.git_repository.get_file(path=path, branch=branch):
+                    return f"Failed to create {path}: {path=} already exists."
+
                 self.git_repository.create_file(File(path=path, content=content), branch)
                 return f"Created {path} in {branch}"
             except GitRepositoryException as e:
@@ -193,7 +246,7 @@ class ToolProvider:
 
         def create_new_branch(branch: str):
             """
-            Create a new branch.
+            Create a new branch in the remote repo.
 
             Parameters
             ----------
@@ -243,7 +296,7 @@ class ToolProvider:
 
         def add_imports(import_statements: list[str], path: str, branch: str) -> str:
             """
-            Add import statements in the project file.
+            Add import statements in the project file of the remote repo.
 
             Parameters
             ----------
@@ -252,7 +305,7 @@ class ToolProvider:
             path : str
                 Path to the file.
             branch : str
-                Name of the branch.
+                Name of the remote branch.
 
             Returns
             -------
@@ -260,6 +313,7 @@ class ToolProvider:
                 Success or failure message.
                 Returns failure message if the branch is protected (e.g. main, master).
                 Returns failure message if the branch does not exist.
+                Returns failure message if the file does not exist.
             """
 
             try:
@@ -271,6 +325,10 @@ class ToolProvider:
                     return f"Failed to add imports to {path}: {branch=} does not exist."
 
                 file = self.git_repository.get_file(path=path, branch=branch)
+
+                if not file:
+                    return f"Failed to add imports to {path}: path does not exist."
+
                 new_file = self.symbol_manipulator.add_imports(import_statements=import_statements, file=file)
                 self.git_repository.update_file(file=new_file, branch=branch)
                 return f"Added imports {import_statements} to {path} in {branch}"
@@ -280,7 +338,7 @@ class ToolProvider:
         def replace_imports(
                 old_import_statement: list[str], new_import_statements: list[str], path: str, branch: str) -> str:
             """
-            Replace import statements in the project file.
+            Replace import statements in the project file of the remote repo.
 
             Parameters
             ----------
@@ -291,7 +349,7 @@ class ToolProvider:
             path : str
                 Path to the file.
             branch : str
-                Name of the branch.
+                Name of the remote branch.
 
             Returns
             -------
@@ -299,6 +357,7 @@ class ToolProvider:
                 Success or failure message.
                 Returns failure message if the branch is protected (e.g. main, master).
                 Returns failure message if the branch does not exist.
+                Returns failure message if the file does not exist.
             """
 
             try:
@@ -311,9 +370,12 @@ class ToolProvider:
                     return f"Failed to replace imports {old_import_statement} with {new_import_statements} in {path}: \
                             {branch=} does not exist."
 
-                # TODO: check if path exists
-
                 file = self.git_repository.get_file(path=path, branch=branch)
+
+                if not file:
+                    return f"Failed to replace imports {old_import_statement} with {new_import_statements} in {path}: \
+                            path does not exist."
+
                 new_file = self.symbol_manipulator.replace_imports(
                     old_imports=old_import_statement,
                     new_imports=new_import_statements,
@@ -325,7 +387,7 @@ class ToolProvider:
 
         def add_symbol(symbol: str, path: str, content: str, branch: str) -> str:
             """
-            Add symbol, e.g. function, class or method to the project file.
+            Add symbol, e.g. function, class or method to the project file of the remote repo.
 
             Parameters
             ----------
@@ -336,7 +398,7 @@ class ToolProvider:
             content : str
                 Definition of the symbol.
             branch : str
-                Name of the branch.
+                Name of the remote branch.
 
             Returns
             -------
@@ -344,6 +406,7 @@ class ToolProvider:
                 Success or failure message.
                 Returns failure message if the branch is protected (e.g. main, master).
                 Returns failure message if the symbol already exists.
+                Returns failure message if the path does not exist.
                 Returns failure message if the symbol definition can not be parsed.
                 Returns failure messages if the symbol definition contains any
                 other expressions except symbol definition.
@@ -359,6 +422,10 @@ class ToolProvider:
                     return f"Failed to add {symbol} to {path}: {branch=} does not exist."
 
                 file = self.git_repository.get_file(path=path, branch=branch)
+
+                if not file:
+                    return f"Failed to add {symbol} to {path}: path does not exist."
+
                 new_file = self.symbol_manipulator.add_symbol(symbol=symbol, content=content, file=file)
                 self.git_repository.update_file(file=new_file, branch=branch)
                 return f"Added {symbol} to {path} on {branch}"

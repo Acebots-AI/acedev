@@ -48,7 +48,7 @@ class OpenAIAgentRunner(AgentRunner):
                 function_name = tool_call.tool
                 function_to_call = tools[function_name]
                 function_response = function_to_call(**tool_call.arguments)
-                logger.debug(f"Function response: {function_response}")
+                logger.info(f"Function response: {function_response}")
                 tool_message = ToolMessage(
                     content=function_response, tool_call_id=tool_call.id
                 )

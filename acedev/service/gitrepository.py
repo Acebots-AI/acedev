@@ -1,6 +1,7 @@
 import logging
 from typing import Generator, Optional
 
+from github import UnknownObjectException
 from github.Repository import Repository
 
 from acedev.service.model import File
@@ -59,11 +60,13 @@ class GitRepository:
             content = file.decoded_content
             yield File(path=file.path, content=content.decode("utf-8"),)
 
-    def get_file(self, path: str, branch: Optional[str] = None) -> File:
-        # TODO: handle missing file
-        file = self.github_repo.get_contents(path, branch or self.default_branch)  # type: ignore[union-attr]
-        content = file.decoded_content
-        return File(path=file.path, content=content.decode("utf-8"),)
+    def get_file(self, path: str, branch: Optional[str] = None) -> Optional[File]:
+        try:
+            file = self.github_repo.get_contents(path, branch or self.default_branch)  # type: ignore[union-attr]
+            content = file.decoded_content
+            return File(path=file.path, content=content.decode("utf-8"),)
+        except UnknownObjectException:
+            return None
 
     def create_new_branch(self, branch: str) -> str:
         logger.info(f"Creating new branch: {branch}")

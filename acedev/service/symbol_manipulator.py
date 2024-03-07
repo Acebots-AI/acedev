@@ -30,13 +30,11 @@ class SymbolManipulator:
 
         return repo_map.rstrip()
 
-    def get_symbol(self, symbol: str, file: File) -> Symbol:
+    def get_symbol(self, symbol: str, file: File) -> Optional[Symbol]:
         syntax_tree = self.parser.parse(file.content.encode())
         node = self._find_symbol(syntax_tree.root_node, symbol)
         if not node:
-            raise SymbolManipulatorException(
-                f"Symbol {symbol} not found in {file.path}"
-            )
+            return None
         return Symbol(content=node.text.decode("utf-8"), path=file.path)
 
     def update_symbol(self, symbol: str, content: str, file: File) -> File:
