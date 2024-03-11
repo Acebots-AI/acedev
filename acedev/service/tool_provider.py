@@ -1,3 +1,5 @@
+import random
+import string
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -246,7 +248,8 @@ class ToolProvider:
 
         def create_new_branch(branch: str):
             """
-            Create a new branch in the remote repo.
+            Create a new branch in the remote repo. Name of the branch is suffixed with a random string
+            to avoid conflicts.
 
             Parameters
             ----------
@@ -260,6 +263,7 @@ class ToolProvider:
                 Returns failure message if the branch already exists.
             """
             try:
+                branch = branch + f"-{self._generate_random_string()}"
                 self.git_repository.create_new_branch(branch)
                 return f"Created new branch {branch}"
             except GitRepositoryException as e:
@@ -442,3 +446,8 @@ class ToolProvider:
             replace_imports.__name__: replace_imports,
             add_symbol.__name__: add_symbol
         }
+
+    @staticmethod
+    def _generate_random_string(length: int = 6) -> str:
+        characters = string.ascii_lowercase + string.digits
+        return ''.join(random.choice(characters) for _ in range(length))
