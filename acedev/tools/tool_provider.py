@@ -209,7 +209,7 @@ class ToolProvider:
         path : str
             Full path to the file, e.g. "module/submodule/file.py".
         diff : str
-            Diff of the file. It should be in the unified diff format.
+            Diff of the file in the unified diff format. It should include a few lines of context.
 
         Returns
         -------
