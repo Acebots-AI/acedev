@@ -34,7 +34,7 @@ class OpenAIAgentRunner(AgentRunner):
                 temperature=self.temperature,
             )
 
-            logger.info(f"Function Calling response: {response}")
+            logger.info(response)
 
             if not response.tool_calls:
                 # If there are no tool calls, add the final response and exit the loop
@@ -48,16 +48,16 @@ class OpenAIAgentRunner(AgentRunner):
                 function_name = tool_call.tool
                 function_to_call = tools[function_name]
                 function_response = function_to_call(**tool_call.arguments)
-                logger.info(f"Function response: {function_response}")
                 tool_message = ToolMessage(
                     content=function_response, tool_call_id=tool_call.id
                 )
+                logger.info(tool_message)
                 messages.append(tool_message)
                 output.append(tool_message)
 
         else:  # This clause executes if the loop was not broken out of, i.e., max_steps was reached
             logger.warning(
-                f"Max steps reached: {self.max_steps}. Last 4 messages: {messages[-4:]}"
+                f"Max steps reached: {self.max_steps}. Last 4 messages:\n{messages[-4:]}"
             )
             output.append(
                 AssistantMessage(content="Help me. I'm stuck 🤖")

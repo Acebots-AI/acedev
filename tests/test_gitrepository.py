@@ -5,7 +5,7 @@ from github.Branch import Branch
 from github.ContentFile import ContentFile
 from github.Repository import Repository
 
-from acedev.service.gitrepository import GitRepository, GitRepositoryException
+from acedev.service.git_repository import GitRepository, GitRepositoryException
 from acedev.service.model import File
 
 

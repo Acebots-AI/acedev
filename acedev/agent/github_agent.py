@@ -16,7 +16,7 @@ from acedev.service.model import (
     PullRequestReviewThread,
     Issue,
 )
-from acedev.service.tool_provider import ToolProvider
+from acedev.tools.tool_provider import ToolProvider
 
 ACEBOTS_APP_USERNAME = os.getenv("GITHUB_APP_USERNAME", "acebots-ai[bot]")
 

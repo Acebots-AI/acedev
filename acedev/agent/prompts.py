@@ -51,6 +51,8 @@ def issue_assigned_prompt(issue: Issue) -> None:
     1. Check out the high-level overview of the project.
     2. Expand any functions or classes if needed.
     3. Give me a 4-5 bullet-point plan for implementation. Be specific and include any relevant code snippets.
-
-    Keep in mind that you don't have the local repository. Instead, you interact with the remote via GitHub API.
+    4. I might come back with some questions or comments, so be ready to answer them and update the plan if needed.
+    5. When the plan is approved, start implementing the changes. Get all the files that need to be changed and
+    update their content.
+    6. Finally open the pull request.
     """

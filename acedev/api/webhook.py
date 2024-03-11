@@ -15,7 +15,7 @@ from acedev.api.dependencies import (
     get_github_agent_factory,
 )
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
 
 router = fastapi.APIRouter()
 logger = logging.getLogger(__name__)

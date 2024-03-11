@@ -3,10 +3,10 @@ from unittest.mock import create_autospec
 import pytest
 
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
 from acedev.service.model import Symbol
-from acedev.service.symbol_manipulator import SymbolManipulator
-from acedev.service.tool_provider import ToolProvider
+from acedev.tools.symbol_manipulator import SymbolManipulator
+from acedev.tools.tool_provider import ToolProvider
 
 
 @pytest.fixture

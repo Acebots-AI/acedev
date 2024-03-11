@@ -19,6 +19,7 @@ uvicorn = {extras = ["standard"], version = "^0.27.0.post1"}
 litellm = "^1.23.14"
 numpydoc = "^1.6.0"
 pytest = "^8.0.2"
+diff-match-patch = "^20230430"
 
 
 [build-system]

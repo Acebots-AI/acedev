@@ -12,7 +12,6 @@ from acedev.agent.prompts import (
     issue_assigned_prompt,
 )
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
 from acedev.service.model import (
     PullRequest,
     FileChange,
@@ -25,7 +24,7 @@ from acedev.service.model import (
     Issue,
     IssueComment,
 )
-from acedev.service.tool_provider import ToolProvider
+from acedev.tools.tool_provider import ToolProvider
 
 ISSUE_NUMBER = 1
 PULL_REQUEST_NUMBER = 1

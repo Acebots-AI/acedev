@@ -116,6 +116,16 @@ class ToolCall(BaseModel):
             arguments=json.loads(data.function.arguments)
         )
 
+    def __str__(self):
+        indented_arguments = "\n    ".join(json.dumps(self.arguments, indent=4).splitlines())
+        return f"Calling {BOLD}{self.tool}{RESET} with {indented_arguments}"
+
+
+# ANSI escape codes for formatting and color
+GREEN = '\033[92m'  # Green text
+BOLD = '\033[1m'   # Bold text
+RESET = '\033[0m'  # Reset to default
+
 
 class ChatMessage(BaseModel):
     role: str
@@ -127,6 +137,10 @@ class ChatMessage(BaseModel):
     @classmethod
     def from_openai_format(cls, data: dict[str, Any]) -> "ChatMessage":
         raise NotImplementedError
+
+    def __str__(self):
+        indented_content = "\n    ".join(self.content.splitlines())
+        return f"{BOLD}{GREEN}{self.role}{RESET}: {indented_content}"
 
 
 class SystemMessage(ChatMessage):
@@ -195,6 +209,11 @@ class AssistantMessage(ChatMessage):
             content=data["content"],
             tool_calls=[ToolCall.from_openai_format(tool_call) for tool_call in data["tool_calls"]] if data.get("tool_calls") else None,
         )
+
+    def __str__(self):
+        indented_content = "\n    ".join(self.content.splitlines()) if self.content else "Calling tools..."
+        tool_calls = "\n    ".join(str(tool_call) for tool_call in self.tool_calls) if self.tool_calls else ""
+        return f"{BOLD}{GREEN}{self.role}{RESET}: {indented_content + ' ' + tool_calls}"
 
 
 class ToolMessage(ChatMessage):

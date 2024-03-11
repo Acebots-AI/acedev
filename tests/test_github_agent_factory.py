@@ -4,7 +4,7 @@ from acedev.agent import AgentRunner
 from acedev.agent.github_agent import GitHubAgent
 from acedev.agent.github_agent_factory import GitHubAgentFactory
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
 
 
 def test_create() -> None:
