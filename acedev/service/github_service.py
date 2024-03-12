@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 
 from github import UnknownObjectException
+from github.GithubException import GithubException
 from github.Repository import Repository
 
 from acedev.service.model import (
@@ -98,6 +99,25 @@ class GitHubService:
         # TODO: handle issue not found
         issue = self.github_repo.get_issue(number=issue_number)
         issue.create_comment(body=body)
+
+    def add_reaction_to_comment(self, comment_id: int, reaction_type: str) -> None:
+        """
+        Adds a reaction to a comment.
+
+        :param comment_id: The ID of the comment to react to.
+        :param reaction_type: The type of reaction to add. For example, 'eyes' for the eyes emoji.
+        """
+        try:
+            comment = self.github_repo.get_issue_comment(comment_id)
+            # The create_reaction method is part of the PyGithub library.
+            # The reaction_type must be one of the supported reaction types by GitHub API.
+            comment.create_reaction(reaction_type)
+            logger.debug(f"Added '{reaction_type}' reaction to comment ID {comment_id}.")
+        except UnknownObjectException as e:
+            error_message = f"Comment with ID {comment_id} not found."
+            logger.error(error_message)
+            raise GitHubServiceException(error_message) from e
+
 
 
 class GitHubServiceException(Exception):
