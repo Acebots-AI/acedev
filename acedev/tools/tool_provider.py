@@ -3,6 +3,7 @@ import string
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from acedev.agent.coding_agent import CodingAgent
 from acedev.service.github_service import GitHubService, GitHubServiceException
 from acedev.service.git_repository import GitRepository, GitRepositoryException
 from acedev.service.model import File
@@ -19,6 +20,7 @@ class ToolProvider:
     github_service: GitHubService
     symbol_manipulator: SymbolManipulator
     code_editor: CodeEditor
+    coding_agent: CodingAgent
 
     def get_default_branch(self):
         """
@@ -149,9 +151,7 @@ class ToolProvider:
             Returns failure message if the path does not exist.
         """
         try:
-            file = self.git_repository.get_file(
-                path=path
-            )
+            file = self.git_repository.get_file(path=path)
 
             if not file:
                 return f"Failed to get {path}: path does not exist."
@@ -171,7 +171,7 @@ class ToolProvider:
         path : str
             Full path to the file, e.g. "module/submodule/file.py".
         diff : str
-            Diff of the file. It should be in the unified diff format.
+            Diff of the file in the unified diff format. It should include a few lines of context.
 
         Returns
         -------
@@ -229,6 +229,50 @@ class ToolProvider:
             return f"Edited {path}. The new file content is:\n\n{new_file.content}"
         except (GitRepositoryException, CodeEditorException) as e:
             return f"Failed to edit {path}: {e.message}"
+
+    def request_edit(self, branch: str, path: str, instruction: str) -> str:
+        """
+        Request the file edit in the remote branch. Someone on your team will handle the request.
+
+        Parameters
+        ----------
+        branch : str
+            Name of the remote branch.
+        path : str
+            Full path to the file, e.g. "module/submodule/file.py".
+        instruction : str
+            Instruction for the edit. Be as specific as possible.
+
+        Returns
+        -------
+        str
+            Success or failure message.
+            Returns failure message if the branch is protected (e.g. main, master).
+            Returns failure message if the branch does not exist.
+            Returns failure message if the path does not exist.
+        """
+        try:
+            if branch == self.git_repository.default_branch:
+                # even if it's not protected, we don't want to push on the default branch
+                return f"Failed to edit {path}: {branch=} is protected."
+
+            if not self.git_repository.branch_exists(branch):
+                return f"Failed to edit {path}: {branch=} does not exist."
+
+            file = self.git_repository.get_file(path=path, branch=branch)
+
+            if not file:
+                return f"Failed to edit {path}: path does not exist."
+
+            new_file = self.coding_agent.edit_file(
+                instructions=instruction,
+                file=file,
+            )
+
+            self.git_repository.update_file(file=new_file, branch=branch)
+            return f"Edited {path}. The new file content is:\n\n{new_file.content}"
+        except GitRepositoryException as e:
+            return f"Failed to edit {path} in {branch}: {e.message}"
 
     def code_understanding_tools(self) -> dict[str, Callable[..., str]]:
 
@@ -570,7 +614,8 @@ class ToolProvider:
         return {
             # update_file.__name__: update_file,
             create_file.__name__: create_file,
-            self.edit_file.__name__: self.edit_file,
+            # self.edit_file.__name__: self.edit_file,
+            self.request_edit.__name__: self.request_edit,
             create_new_branch.__name__: create_new_branch,
             create_pull_request.__name__: create_pull_request,
             # add_imports.__name__: add_imports,
