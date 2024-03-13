@@ -47,3 +47,9 @@ class CodingAgent:
         logger.info(f"Applying diff to {file.path}:\n{diff}")
 
         return self.code_editor.apply_diff(diff, file)
+
+
+class CodingAgentException(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message

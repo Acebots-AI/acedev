@@ -3,10 +3,6 @@ import logging
 import re
 import subprocess
 from dataclasses import dataclass
-
-from diff_match_patch import diff_match_patch
-
-from acedev.service.git_repository import GitRepository
 from acedev.service.model import File
 
 logger = logging.getLogger(__name__)
@@ -21,48 +17,48 @@ class CodeEditor:
         diff = add_suffix_context(diff, file_content)
         hunks = split_diff_into_hunks(diff)
         for hunk in hunks:
-            before, after = split_hunk_to_before_after(hunk)
-            before = remove_non_existing_lines(before, file_content)
-            norm_diff = normalize_diff(before, after, file.path)
-
-            # Create a temporary file to hold the original content
-            filename = file.path.split("/")[-1]
-            tmp_path = f"/tmp/{filename}"
-            with open(tmp_path, "w") as f:
-                f.write(file_content)
-
-            diff_path = f"/tmp/{filename}.diff"
-            with open(diff_path, "w") as f:
-                f.write(norm_diff)
-
-            # Prepare the patch command, reading from stdin with '-'
-            command = ["patch", "--verbose", tmp_path, diff_path]
-
-            # Execute the patch command, providing the patch content via stdin
-            process = subprocess.run(
-                command, text=True, capture_output=True
+            norm_diff = normalize_hunk(
+                hunk.splitlines(keepends=True),
+                file.path,
+                file_content.splitlines(keepends=True),
             )
 
-            # Check the result
-            if process.returncode == 0:
-                logger.info(f"Patch applied successfully:\n{process.stdout}")
-                # Read the patched content
-                with open(tmp_path, "r") as f:
-                    patched_content = f.read()
-
-                # Clean up the temporary file
-                subprocess.run(["rm", f"{tmp_path}*"])
-
-                file_content = patched_content
-            else:
-                logger.error(f"Failed to apply patch: {process.stdout}")
-                # Clean up the temporary file
-                subprocess.run(["rm", f"{tmp_path}*"])
-                raise CodeEditorException(
-                    f"Failed to apply diff to {file.path}: {process.stdout}"
-                )
+            file_content = run_patch_cli(file.path, file_content, norm_diff)
 
         return File(path=file.path, content=file_content)
+
+
+def run_patch_cli(file_path: str, file_content: str, norm_diff: str) -> str:
+    # Create a temporary file to hold the original content
+    filename = file_path.split("/")[-1]
+    tmp_file_path = f"/tmp/{filename}"
+    with open(tmp_file_path, "w") as f:
+        f.write(file_content)
+
+    # Create a temporary file to hold the diff
+    tmp_diff_path = f"/tmp/{filename}.diff"
+    with open(tmp_diff_path, "w") as f:
+        f.write(norm_diff)
+
+    # Prepare the patch command
+    command = ["patch", "--verbose", tmp_file_path, tmp_diff_path]
+
+    # Execute the patch command
+    process = subprocess.run(command, text=True, capture_output=True)
+
+    # Check the result
+    if process.returncode == 0:
+        logger.info(f"Patch applied successfully:\n{process.stdout}")
+        # Read the patched content
+        with open(tmp_file_path, "r") as f:
+            patched_content = f.read()
+
+        return patched_content
+    else:
+        logger.error(f"Failed to apply patch: {process.stdout}")
+        raise CodeEditorException(
+            f"Failed to apply diff to {file_path}: {process.stdout}"
+        )
 
 
 class CodeEditorException(Exception):
@@ -73,26 +69,51 @@ class CodeEditorException(Exception):
 
 def split_diff_into_hunks(diff: str) -> list[str]:
     # Pattern to identify the start of hunks
-    hunk_start_pattern = re.compile(r'^@@.*?@@', re.MULTILINE)
+    hunk_start_pattern = re.compile(r"^@@.*?@@", re.MULTILINE)
 
     # Find all match positions (start of each hunk)
     hunk_starts = [match.start() for match in hunk_start_pattern.finditer(diff)]
 
     # Split the diff text into hunks using the identified positions
-    hunks = [diff[hunk_starts[i]:hunk_starts[i+1]-1] for i in range(len(hunk_starts)-1)]
+    hunks = [
+        diff[hunk_starts[i] : hunk_starts[i + 1] - 1]
+        for i in range(len(hunk_starts) - 1)
+    ]
     # Add the last hunk
-    hunks.append(diff[hunk_starts[-1]:])
+    hunks.append(diff[hunk_starts[-1] :])
 
     return hunks
 
 
+def normalize_hunk(
+    hunk_lines: list[str], filename: str, file_content_lines: list[str]
+) -> str:
+    before_lines, after_lines = split_hunk_to_before_after(hunk_lines, as_lines=True)
+    before_lines = remove_non_existing_lines(before_lines, file_content_lines)
+    before_lines = add_missing_lines(before_lines, file_content_lines)
+    diff_lines = unified_diff(before_lines, after_lines, filename)
+
+    for idx, line in enumerate(diff_lines):
+        if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
+            continue
+        if line.startswith("-") and line not in hunk_lines:
+            logger.warning(
+                f"Removed line not found in original hunk: {line}. Leaving it in the diff."
+            )
+            diff_lines[idx] = " " + line[1:]
+
+    before_lines, after_lines = split_hunk_to_before_after(diff_lines, as_lines=True)
+    diff_lines = unified_diff(before_lines, after_lines, filename)
+    return "".join(diff_lines)
+
+
 def split_hunk_to_before_after(
-    hunk: str, as_lines: bool = False
+    hunk_lines: list[str], as_lines: bool = False
 ) -> tuple[list[str], list[str]] | tuple[str, str]:
     before = []
     after = []
 
-    for line in hunk.splitlines(keepends=True):
+    for line in hunk_lines:
         if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
             continue
 
@@ -125,43 +146,103 @@ def split_hunk_to_before_after(
     return "".join(before), "".join(after)
 
 
-def remove_non_existing_lines(content: str, existing_content: str) -> str:
-    existing_lines = existing_content.splitlines(keepends=True)
+def remove_non_existing_lines(
+    content_lines: list[str], existing_content_lines: list[str]
+) -> list[str]:
     result = []
+    current_line_number = None
+    for line in content_lines:
+        if line in existing_content_lines:
+            current_line_number = existing_content_lines.index(line)
+            break
 
-    for line in content.splitlines(keepends=True):
-        if line in existing_lines:
+    if current_line_number is None:
+        logger.warning(
+            f"None of the lines in Before block found in existing content. \
+            Dropping these lines: {content_lines}"
+        )
+        return result
+
+    for idx, line in enumerate(content_lines):
+        if current_line_number >= len(existing_content_lines):
+            logger.warning(
+                f"Reached end of file while removing non existing lines from Before block. \
+                Dropping these lines: {content_lines[idx:]}"
+            )
+            break
+
+        if line == existing_content_lines[current_line_number]:
             result.append(line)
+            current_line_number += 1
         else:
             logger.warning(f"Line not found in existing content: {line}")
+            if line in existing_content_lines[current_line_number:]:
+                content_lines.append(line)
+                current_line_number += 1
 
-    return "".join(result)
+    return result
 
 
-def normalize_diff(before: str, after: str, filename: str) -> str:
-    before_lines = before.splitlines(keepends=True)
-    after_lines = after.splitlines(keepends=True)
-    diff = difflib.unified_diff(
-        before_lines,
-        after_lines,
-        fromfile=filename,
-        tofile=filename,
-        n=max(len(before_lines), len(after_lines)),
+def add_missing_lines(
+    content_lines: list[str], existing_content_lines: list[str]
+) -> list[str]:
+    current_line_number = existing_content_lines.index(content_lines[0])
+
+    for idx, line in enumerate(content_lines):
+        if current_line_number >= len(existing_content_lines):
+            logger.warning(
+                f"Reached end of file while adding missing lines to Before block. \
+                Dropping these lines: {content_lines[idx:]}"
+            )
+            break
+
+        if line != existing_content_lines[current_line_number]:
+            logger.warning(
+                f"Found missing line: {existing_content_lines[current_line_number]}"
+            )
+            content_lines.insert(idx, existing_content_lines[current_line_number])
+
+        current_line_number += 1
+
+    return content_lines
+
+
+def unified_diff(
+    before_lines: list[str], after_lines: list[str], filename: str
+) -> list[str]:
+    return list(
+        difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile=filename,
+            tofile=filename,
+            n=max(len(before_lines), len(after_lines)),
+        )
     )
-    return "".join(diff)
 
 
 def add_suffix_context(diff: str, file_content: str):
     diff_lines = diff.splitlines(keepends=True)
+
+    if diff_lines[-1].startswith(" "):
+        return diff
+
     file_lines = file_content.splitlines(keepends=True)
     last_existing_line = ""
     for line in diff_lines:
-        if line.startswith(" "):
+        if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
+            continue
+        if (line.startswith(" ") or line.startswith("-")) and line.strip():
             last_existing_line = line[1:]
 
     last_existing_line_index = file_lines.index(last_existing_line)
 
     if last_existing_line_index != len(file_lines) - 1:
-        diff_lines.extend(" " + line for line in file_lines[last_existing_line_index + 1:last_existing_line_index + 4])
+        diff_lines.extend(
+            " " + line
+            for line in file_lines[
+                last_existing_line_index + 1 : last_existing_line_index + 4
+            ]
+        )
 
     return "".join(diff_lines)
