@@ -245,6 +245,9 @@ def handle_issue_comment(
                 comment_id=payload.comment.id,
                 reaction='eyes'
             )
+            github_agent.handle_issue_comment(
+                issue_number=payload.issue.number,
+            )
         else:
             github_agent.handle_issue_comment(
                 issue_number=payload.issue.number,
