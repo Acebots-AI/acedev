@@ -84,8 +84,12 @@ Issue body:
 
 Here's what I expect from you now:
 1. Check out the high-level overview of the project.
-2. Expand any functions or classes if needed.
-3. Give me a 4-5 bullet-point plan for implementation. Be specific and include any relevant code snippets.
-
-Keep in mind that you don't have the local repository. Instead, you interact with the remote via GitHub API.\
+2. Expand any files if needed.
+3. Give me a 4-5 bullet-point plan for implementation. Be specific and include any relevant code snippets. The plan
+must contain the list of files that need to be changed and the changes that need to be made. If there are multiple
+options, pick the best one and explain why it's the best.
+4. I might come back with some questions or comments, so be ready to answer them and update the plan if needed.
+5. When the plan is approved, start implementing the changes. Get all the files that need to be changed and
+update their content.
+6. Finally open the pull request.\
 """
