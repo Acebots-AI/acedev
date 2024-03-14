@@ -3,6 +3,8 @@ import logging
 import re
 import subprocess
 from dataclasses import dataclass
+from typing import Optional
+
 from acedev.service.model import File
 
 logger = logging.getLogger(__name__)
@@ -14,21 +16,36 @@ class CodeEditor:
     @staticmethod
     def apply_diff(diff: str, file: File) -> File:
         file_content = file.content
-        diff = add_suffix_context(diff, file_content)
         hunks = split_diff_into_hunks(diff)
         for hunk in hunks:
-            norm_diff = normalize_hunk(
+            norm_diff_lines = normalize_diff(hunk.splitlines(keepends=True), file.path)
+            norm_diff = "".join(norm_diff_lines)
+            updated_file = run_patch_cli(file.path, file_content, norm_diff)
+
+            if updated_file:
+                file_content = updated_file
+                continue
+
+            fixed_honk = fix_hunk(
                 hunk.splitlines(keepends=True),
                 file.path,
                 file_content.splitlines(keepends=True),
             )
 
-            file_content = run_patch_cli(file.path, file_content, norm_diff)
+            updated_file = run_patch_cli(file.path, file_content, fixed_honk)
+
+            if updated_file:
+                file_content = updated_file
+                continue
+            else:
+                raise CodeEditorException(
+                    f"Failed to apply diff to {file.path}: {norm_diff}"
+                )
 
         return File(path=file.path, content=file_content)
 
 
-def run_patch_cli(file_path: str, file_content: str, norm_diff: str) -> str:
+def run_patch_cli(file_path: str, file_content: str, norm_diff: str) -> Optional[str]:
     # Create a temporary file to hold the original content
     filename = file_path.split("/")[-1]
     tmp_file_path = f"/tmp/{filename}"
@@ -56,9 +73,10 @@ def run_patch_cli(file_path: str, file_content: str, norm_diff: str) -> str:
         return patched_content
     else:
         logger.error(f"Failed to apply patch: {process.stdout}")
-        raise CodeEditorException(
-            f"Failed to apply diff to {file_path}: {process.stdout}"
-        )
+        # raise CodeEditorException(
+        #     f"Failed to apply diff to {file_path}: {process.stdout}"
+        # )
+        return None
 
 
 class CodeEditorException(Exception):
@@ -85,9 +103,10 @@ def split_diff_into_hunks(diff: str) -> list[str]:
     return hunks
 
 
-def normalize_hunk(
+def fix_hunk(
     hunk_lines: list[str], filename: str, file_content_lines: list[str]
 ) -> str:
+    hunk_lines = add_suffix_context(hunk_lines, file_content_lines)
     before_lines, after_lines = split_hunk_to_before_after(hunk_lines, as_lines=True)
     before_lines = remove_non_existing_lines(before_lines, file_content_lines)
     before_lines = add_missing_lines(before_lines, file_content_lines)
@@ -102,9 +121,14 @@ def normalize_hunk(
             )
             diff_lines[idx] = " " + line[1:]
 
+    diff_lines = normalize_diff(diff_lines, filename)
+    return "".join(diff_lines)
+
+
+def normalize_diff(diff_lines: list[str], filename: str) -> list[str]:
     before_lines, after_lines = split_hunk_to_before_after(diff_lines, as_lines=True)
     diff_lines = unified_diff(before_lines, after_lines, filename)
-    return "".join(diff_lines)
+    return diff_lines
 
 
 def split_hunk_to_before_after(
@@ -221,17 +245,12 @@ def unified_diff(
     )
 
 
-def add_suffix_context(diff: str, file_content: str):
-    diff_lines = diff.splitlines(keepends=True)
-
+def add_suffix_context(diff_lines: list[str], file_lines: list[str]) -> list[str]:
     if diff_lines[-1].startswith(" "):
-        return diff
+        return diff_lines
 
-    file_lines = file_content.splitlines(keepends=True)
     last_existing_line = ""
     for line in diff_lines:
-        if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
-            continue
         if (line.startswith(" ") or line.startswith("-")) and line.strip():
             last_existing_line = line[1:]
 
@@ -245,4 +264,4 @@ def add_suffix_context(diff: str, file_content: str):
             ]
         )
 
-    return "".join(diff_lines)
+    return diff_lines
