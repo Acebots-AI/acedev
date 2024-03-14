@@ -98,6 +98,21 @@ class GitHubService:
         # TODO: handle issue not found
         issue = self.github_repo.get_issue(number=issue_number)
         issue.create_comment(body=body)
+        
+    def react_to_comment(self, comment_id: int, reaction: str) -> None:
+        try:
+            comment = self.github_repo.get_issue_comment(comment_id)
+            comment.create_reaction(reaction)
+            logger.info(f"Added reaction '{reaction}' to comment ID {comment_id}")
+        except UnknownObjectException as e:
+            error_message = f"Comment with ID {comment_id} not found"
+            logger.error(error_message)
+            raise GitHubServiceException(error_message) from e
+        except Exception as e:
+            error_message = f"Failed to add reaction to comment ID {comment_id}"
+            logger.error(f"{error_message}: {str(e)}")
+            raise GitHubServiceException(error_message) from e
+
 
 
 class GitHubServiceException(Exception):
