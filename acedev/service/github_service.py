@@ -98,6 +98,33 @@ class GitHubService:
         # TODO: handle issue not found
         issue = self.github_repo.get_issue(number=issue_number)
         issue.create_comment(body=body)
+    
+    def add_reaction_to_issue_comment(self, owner: str, repo: str, comment_id: int, reaction_type: str) -> None:
+        import requests
+        url = f"https://api.github.com/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions"
+        headers = {
+            "Accept": "application/vnd.github.squirrel-girl-preview+json",
+            "Authorization": f"token {self.github_repo._identity._token}"
+        }
+        data = {"content": reaction_type}
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code not in [200, 201]:
+            logger.error(f"Failed to add reaction to issue comment: {response.json()}")
+            raise GitHubServiceException("Failed to add reaction to issue comment")
+
+    def add_reaction_to_pull_request_review_comment(self, owner: str, repo: str, comment_id: int, reaction_type: str) -> None:
+        import requests
+        url = f"https://api.github.com/repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions"
+        headers = {
+            "Accept": "application/vnd.github.squirrel-girl-preview+json",
+            "Authorization": f"token {self.github_repo._identity._token}"
+        }
+        data = {"content": reaction_type}
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code not in [200, 201]:
+            logger.error(f"Failed to add reaction to pull request review comment: {response.json()}")
+            raise GitHubServiceException("Failed to add reaction to pull request review comment")
+
 
 
 class GitHubServiceException(Exception):
