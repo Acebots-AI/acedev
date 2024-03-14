@@ -99,6 +99,21 @@ class GitHubService:
         issue = self.github_repo.get_issue(number=issue_number)
         issue.create_comment(body=body)
 
+    def add_reaction_to_comment(self, issue_number: int, comment_id: int, reaction: str) -> None:
+        """
+        Add a reaction to a comment on an issue or pull request.
+        
+        Parameters:
+        - issue_number: The number of the issue or pull request.
+        - comment_id: The ID of the comment to react to.
+        - reaction: The content of the reaction (e.g., "eyes").
+        """
+        issue = self.github_repo.get_issue(number=issue_number)
+        comment = issue.get_comment(comment_id)
+        comment.create_reaction(reaction)
+
+
+
 
 class GitHubServiceException(Exception):
     def __init__(self, message: str):
