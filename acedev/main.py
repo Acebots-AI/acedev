@@ -9,7 +9,7 @@ from acedev.api.api import get_api
 from acedev.agent.openai_agent_runner import OpenAIAgentRunner
 from acedev.service.openai_service import OpenAIService
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s : %(message)s")
 
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
