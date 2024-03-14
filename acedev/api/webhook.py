@@ -203,10 +203,17 @@ def handle_pull_request_review_comment(
             agent_runner=openai_agent,
         )
 
-        github_agent.handle_pull_request_review_comment(
-            comment_id=payload.comment.id,
-            pull_request_number=payload.pull_request.number,
-        )
+        if "@acedev-ai" in payload.comment.body:
+            github_agent.github_service.add_reaction_to_comment(
+                issue_number=payload.pull_request.number,
+                comment_id=payload.comment.id,
+                reaction='eyes'
+            )
+        else:
+            github_agent.handle_pull_request_review_comment(
+                comment_id=payload.comment.id,
+                pull_request_number=payload.pull_request.number,
+            )
     except Exception:
         logger.exception(f"Failed to handle pull request review comment: {payload=}")
 
@@ -228,9 +235,16 @@ def handle_issue_comment(
             agent_runner=openai_agent,
         )
 
-        github_agent.handle_issue_comment(
-            issue_number=payload.issue.number,
-        )
+        if "@acedev-ai" in payload.comment.body:
+            github_agent.github_service.add_reaction_to_comment(
+                issue_number=payload.issue.number,
+                comment_id=payload.comment.id,
+                reaction='eyes'
+            )
+        else:
+            github_agent.handle_issue_comment(
+                issue_number=payload.issue.number,
+            )
     except Exception:
         logger.exception(f"Failed to handle issue comment: {payload=}")
 
