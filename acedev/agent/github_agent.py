@@ -113,10 +113,8 @@ class GitHubAgent:
         :param comment_id: ID of the comment
         :param reaction_type: Type of reaction (e.g., 'eyes')
         """
-        if comment_type == 'issue':
-            self.github_service.add_reaction_to_issue_comment(comment_id, reaction_type)
-        elif comment_type == 'pull_request':
-            self.github_service.add_reaction_to_pull_request_review_comment(comment_id, reaction_type)
+        if comment_type == 'issue' or comment_type == 'pull_request':
+            self.github_service.add_reaction_to_comment(self.github_repo, comment_id, reaction_type)
 
     @staticmethod
     def _message_history_from_review_comment(
