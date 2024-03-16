@@ -3,8 +3,7 @@ import pytest
 from acedev.service.model import File
 from acedev.tools.code_editor import (
     CodeEditor,
-    add_missing_lines,
-    remove_non_existing_lines,
+    reconcile_subsequence,
 )
 
 
@@ -149,8 +148,7 @@ existing line 2
 """,
     )
 
-    # not working
-    # assert code_editor.apply_diff(diff2, file) == expected2
+    assert code_editor.apply_diff(diff2, file) == expected2
 
     diff3 = """\
 --- file.py
@@ -428,7 +426,6 @@ existing line 4
     assert code_editor.apply_diff(diff4, file) == expected4
 
 
-@pytest.mark.skip(reason="not working")
 def test_removing_line_succeeds_when_suffix_context_is_missing(
     code_editor: CodeEditor,
 ) -> None:
@@ -538,423 +535,89 @@ existing line 10
     assert code_editor.apply_diff(diff2, file) == expected2
 
 
-def test_add_missing_lines() -> None:
-    content_lines1 = [
-        "existing line 1",
-        "existing line 4",
-    ]
-
-    existing_content_lines1 = [
-        "existing line 1",
-        "existing line 2",
-        "existing line 3",
-        "existing line 4",
-    ]
-
-    assert (
-        add_missing_lines(content_lines1, existing_content_lines1)
-        == existing_content_lines1
-    )
-
-    content_lines2 = [
-        "existing line 1",
-        "existing line 3",
-    ]
-
-    existing_content_lines2 = [
-        "existing line 1",
-        "existing line 2",
-        "existing line 3",
-        "existing line 4",
-    ]
-
-    assert add_missing_lines(content_lines2, existing_content_lines2) == [
-        "existing line 1",
-        "existing line 2",
-        "existing line 3",
-    ]
-
-    content_lines3 = [
-        "existing line 1",
-        "existing line 3",
-    ]
-
-    existing_content_lines3 = [
-        "existing line 1",
-        "existing line 2",
-        "existing line 3",
-        "existing line 4",
-    ]
-
-    assert add_missing_lines(content_lines3, existing_content_lines3) == content_lines3
-
-
-def test_removing_non_existing_lines() -> None:
-    existing_content_lines = [
-        "existing line 1",
-        "existing line 2",
-        "existing line 3",
-        "existing line 4",
-    ]
-
-    content_lines1 = [
-        "existing line 1",
-        "existing line 2",
-        "non existing line 1",
-        "existing line 3",
-        "existing line 4",
-    ]
-
-    assert (
-        remove_non_existing_lines(content_lines1, existing_content_lines)
-        == existing_content_lines
-    )
-
-    content_lines2 = [
-        "existing line 1",
-        "existing line 2",
-        "non existing line 1",
-    ]
-
-    assert remove_non_existing_lines(content_lines2, existing_content_lines) == [
-        "existing line 1",
-        "existing line 2",
-    ]
-
-    content_lines3 = [
-        "non existing line 1",
-        "existing line 1",
-        "existing line 2",
-    ]
-
-    assert remove_non_existing_lines(content_lines3, existing_content_lines) == [
-        "existing line 1",
-        "existing line 2",
-    ]
-
-
-def test_case(code_editor: CodeEditor) -> None:
-    diff = '''\
---- tests/test_api.py
-+++ tests/test_api.py
+def test_adding_lines_at_eof_succeeds_with_fallback(code_editor: CodeEditor) -> None:
+    diff = """\
+--- file.py
++++ file.py
 @@ ... @@
- def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-     """Test that the division endpoint returns a 400 when dividing by 0."""
-
-     # GIVEN the division path and two numbers to divide
-     path = "/v1/maths/division"
-     body = {"number1": 2, "number2": 0}
-
-     # WHEN calling the api
-     response = client.post(path, json=body)
-
-     # THEN the status code should be 400 (Bad request)
-     assert response.status_code == 400
-
-+def test_exponentiation(client: starlette.testclient.TestClient) -> None:
-+    """Test that the exponentiation endpoint correctly calculates A^B."""
-+    response = client.post("/exponentiation", json={"A": 2, "B": 3})
-+    assert response.status_code == 200
-+    assert response.json() == {"result": 8}
-+
-+
-'''
-
-    file = File(
-        path="tests/test_api.py",
-        content='''\
-"""Examples testing the api using the starlette TestClient.
-
-The test fixture "client" is defined in conftest.py
-These tests are trivial examples, they are not meant as an introduction to
-proper testing.
-
-Read more about testing in the FastAPI docs:
-https://fastapi.tiangolo.com/tutorial/testing/
+ def test_func():
+     assert True
+ 
++def test_func2():
++    assert True
++    assert True
 """
 
-import starlette.testclient
-
-
-def test_read_root(client: starlette.testclient.TestClient) -> None:
-    """Test that the root path can be read."""
-
-    # GIVEN the root path
-    path = "/"
-
-    # WHEN calling the api
-    response = client.get(path)
-
-    # THEN status_code should be 200
-    assert response.status_code == 200
-
-
-def test_addition(client: starlette.testclient.TestClient) -> None:
-    """Test that the addition endpoint correctly sums two numbers."""
-
-    # GIVEN the addition path and two numbers to sum
-    path = "/v1/maths/addition"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the sum should be 5
-    assert response.json().get("result") == 5
-
-
-def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-    """Test that the division endpoint returns a 400 when dividing by 0."""
-
-    # GIVEN the division path and two numbers to divide
-    path = "/v1/maths/division"
-    body = {"number1": 2, "number2": 0}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the status code should be 400 (Bad request)
-    assert response.status_code == 400
-''',
+    file = File(
+        path="file.py",
+        content="""\
+def test_func():
+    assert True
+""",
     )
 
     expected = File(
-        path="tests/test_api.py",
-        content='''\
-"""Examples testing the api using the starlette TestClient.
+        path="file.py",
+        content="""\
+def test_func():
+    assert True
 
-The test fixture "client" is defined in conftest.py
-These tests are trivial examples, they are not meant as an introduction to
-proper testing.
+def test_func2():
+    assert True
+    assert True
+""",
+    )
 
-Read more about testing in the FastAPI docs:
-https://fastapi.tiangolo.com/tutorial/testing/
+    assert code_editor.apply_diff(diff, file) == expected
+
+    diff = """\
+--- file.py
++++ file.py
+@@ ... @@
+ def test_func():
+     assert True
+ 
+ def test_func1():
+     assert True
+ 
++def test_func2():
++    assert True
++    assert True
++
 """
 
-import starlette.testclient
+    file = File(
+        path="file.py",
+        content="""\
+def test_func():
+    assert True
 
+def test_func1():
+    assert True
+""",
+    )
 
-def test_read_root(client: starlette.testclient.TestClient) -> None:
-    """Test that the root path can be read."""
+    expected = File(
+        path="file.py",
+        content="""\
+def test_func():
+    assert True
 
-    # GIVEN the root path
-    path = "/"
+def test_func1():
+    assert True
 
-    # WHEN calling the api
-    response = client.get(path)
+def test_func2():
+    assert True
+    assert True
 
-    # THEN status_code should be 200
-    assert response.status_code == 200
-
-
-def test_addition(client: starlette.testclient.TestClient) -> None:
-    """Test that the addition endpoint correctly sums two numbers."""
-
-    # GIVEN the addition path and two numbers to sum
-    path = "/v1/maths/addition"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the sum should be 5
-    assert response.json().get("result") == 5
-
-
-def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-    """Test that the division endpoint returns a 400 when dividing by 0."""
-
-    # GIVEN the division path and two numbers to divide
-    path = "/v1/maths/division"
-    body = {"number1": 2, "number2": 0}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the status code should be 400 (Bad request)
-    assert response.status_code == 400
-
-def test_exponentiation(client: starlette.testclient.TestClient) -> None:
-    """Test that the exponentiation endpoint correctly calculates A^B."""
-    response = client.post("/exponentiation", json={"A": 2, "B": 3})
-    assert response.status_code == 200
-    assert response.json() == {"result": 8}
-
-
-''',
+""",
     )
 
     assert code_editor.apply_diff(diff, file) == expected
 
 
-def test_case1(code_editor: CodeEditor) -> None:
-    diff = '''\
---- tests/test_api.py
-+++ tests/test_api.py
-@@ ... @@
- def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-     """Test that the division endpoint returns a 400 when dividing by 0."""
- 
-     # GIVEN the division path and two numbers to divide
-     path = "/v1/maths/division"
-     body = {"number1": 2, "number2": 0}
- 
-     # WHEN calling the api
-     response = client.post(path, json=body)
- 
-     # THEN the status code should be 400 (Bad request)
-     assert response.status_code == 400
- 
-+def test_exponentiation(client: starlette.testclient.TestClient) -> None:
-+    """Test that the exponentiation endpoint correctly calculates A^B."""
-+    # GIVEN the exponentiation path and two numbers to exponentiate
-+    path = "/exponentiation"
-+    body = {"number1": 2, "number2": 3}
-+
-+    # WHEN calling the api
-+    response = client.post(path, json=body)
-+
-+    # THEN the result should be 8
-+    assert response.json().get("result") == 8
-+
-+
-'''
-
-    file = File(
-        path="tests/test_api.py",
-        content='''\
-"""Examples testing the api using the starlette TestClient.
-
-The test fixture "client" is defined in conftest.py
-These tests are trivial examples, they are not meant as an introduction to
-proper testing.
-
-Read more about testing in the FastAPI docs:
-https://fastapi.tiangolo.com/tutorial/testing/
-"""
-
-import starlette.testclient
-
-
-def test_read_root(client: starlette.testclient.TestClient) -> None:
-    """Test that the root path can be read."""
-
-    # GIVEN the root path
-    path = "/"
-
-    # WHEN calling the api
-    response = client.get(path)
-
-    # THEN status_code should be 200
-    assert response.status_code == 200
-
-
-def test_addition(client: starlette.testclient.TestClient) -> None:
-    """Test that the addition endpoint correctly sums two numbers."""
-
-    # GIVEN the addition path and two numbers to sum
-    path = "/v1/maths/addition"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the sum should be 5
-    assert response.json().get("result") == 5
-
-
-def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-    """Test that the division endpoint returns a 400 when dividing by 0."""
-
-    # GIVEN the division path and two numbers to divide
-    path = "/v1/maths/division"
-    body = {"number1": 2, "number2": 0}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the status code should be 400 (Bad request)
-    assert response.status_code == 400
-''',
-    )
-
-    expected = File(
-        path="tests/test_api.py",
-        content='''\
-"""Examples testing the api using the starlette TestClient.
-
-The test fixture "client" is defined in conftest.py
-These tests are trivial examples, they are not meant as an introduction to
-proper testing.
-
-Read more about testing in the FastAPI docs:
-https://fastapi.tiangolo.com/tutorial/testing/
-"""
-
-import starlette.testclient
-
-
-def test_read_root(client: starlette.testclient.TestClient) -> None:
-    """Test that the root path can be read."""
-
-    # GIVEN the root path
-    path = "/"
-
-    # WHEN calling the api
-    response = client.get(path)
-
-    # THEN status_code should be 200
-    assert response.status_code == 200
-
-
-def test_addition(client: starlette.testclient.TestClient) -> None:
-    """Test that the addition endpoint correctly sums two numbers."""
-
-    # GIVEN the addition path and two numbers to sum
-    path = "/v1/maths/addition"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the sum should be 5
-    assert response.json().get("result") == 5
-
-
-def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-    """Test that the division endpoint returns a 400 when dividing by 0."""
-
-    # GIVEN the division path and two numbers to divide
-    path = "/v1/maths/division"
-    body = {"number1": 2, "number2": 0}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the status code should be 400 (Bad request)
-    assert response.status_code == 400
-
-def test_exponentiation(client: starlette.testclient.TestClient) -> None:
-    """Test that the exponentiation endpoint correctly calculates A^B."""
-    # GIVEN the exponentiation path and two numbers to exponentiate
-    path = "/exponentiation"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the result should be 8
-    assert response.json().get("result") == 8
-
-
-''',
-    )
-
-    assert code_editor.apply_diff(diff, file) == expected
-
-
-def test_case2(code_editor: CodeEditor) -> None:
-    diff = '''\
+def test_case_for_removing_lines_eof(code_editor: CodeEditor) -> None:
+    diff = """\
 --- tests/test_api.py
 +++ tests/test_api.py
 @@ ... @@
@@ -965,7 +628,7 @@ def test_case2(code_editor: CodeEditor) -> None:
 -The test fixture "client" is defined in conftest.py
 -These tests are trivial examples, they are not meant as an introduction to
 -proper testing.
-'''
+"""
 
     file = File(
         path="tests/test_api.py",
@@ -1118,155 +781,249 @@ def test_exponentiation(client: starlette.testclient.TestClient) -> None:
     assert code_editor.apply_diff(diff, file) == expected
 
 
-def test_case3(code_editor: CodeEditor) -> None:
-    diff = '''\
---- tests/test_api.py
-+++ tests/test_api.py
-@@ ... @@
- def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-     """Test that the division endpoint returns a 400 when dividing by 0."""
- 
-     # GIVEN the division path and two numbers to divide
-     path = "/v1/maths/division"
-     body = {"number1": 2, "number2": 0}
- 
-     # WHEN calling the api
-     response = client.post(path, json=body)
- 
-     # THEN the status code should be 400 (Bad request)
-     assert response.status_code == 400
- 
-+def test_exponentiation(client: starlette.testclient.TestClient) -> None:
-+    """Test that the exponentiation endpoint correctly calculates the power of a number."""
-+    response = client.post("/exponentiation", json={"number1": 2, "number2": 3})
-+    assert response.status_code == 200
-+    assert response.json() == {"result": 8}
-+
-+
-'''
+def test_reconcile_subsequence() -> None:
+    subsequence = ["line 1", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5",
+        "line 6",
+        "line 7",
+        "line 8",
+        "line 9",
+        "line 10",
+    ]
 
-    file = File(
-        path="tests/test_api.py",
-        content='''\
-"""Examples testing the api using the starlette TestClient.
+    expected = ["line 1", "line 2", "line 3", "line 4"]
+    result = reconcile_subsequence(subsequence, superset, 0)
 
-The test fixture "client" is defined in conftest.py
-These tests are trivial examples, they are not meant as an introduction to
-proper testing.
+    assert result == expected, f"Expected {expected}, but got {result}"
 
-Read more about testing in the FastAPI docs:
-https://fastapi.tiangolo.com/tutorial/testing/
+    subsequence = ["line 1", "line 2", "foo", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5",
+        "line 6",
+        "line 7",
+        "line 8",
+        "line 9",
+        "line 10",
+    ]
+
+    expected = ["line 1", "line 2", "line 3", "line 4"]
+    result = reconcile_subsequence(subsequence, superset, 0)
+
+    assert result == expected, f"Expected {expected}, but got {result}"
+
+    subsequence = ["line 1", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5",
+    ]
+
+    # Despite having more elements, this subsequence is valid
+    expected = ["line 1", "line 2", "line 1", "line 2", "line 3", "line 4"]
+    result = reconcile_subsequence(subsequence, superset, 0)
+
+    assert result == expected, f"Expected {expected}, but got {result}"
+
+    subsequence = ["line 1", "foo", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5",
+        "line 6",
+        "line 7",
+        "line 8",
+        "line 9",
+        "line 10",
+    ]
+
+    expected = ["line 1", "line 2", "line 3", "line 4"]
+    result = reconcile_subsequence(subsequence, superset, 0)
+
+    assert result == expected, f"Expected {expected}, but got {result}"
+
+    subsequence = ["line 0", "line 1", "line 2", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5",
+        "line 6",
+        "line 7",
+        "line 8",
+        "line 9",
+        "line 10",
+    ]
+
+    expected = ["line 1", "line 2", "line 3", "line 4"]
+    result = reconcile_subsequence(subsequence, superset, 0)
+
+    assert result == expected, f"Expected {expected}, but got {result}"
+
+    subsequence = ["line 1", "foo", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+        "line 5",
+        "line 6",
+        "line 7",
+        "line 8",
+        "line 9",
+        "line 10",
+    ]
+
+    expected = ["line 1", "line 2", "line 3", "line 4", "line 5", "line 6", "line 7"]
+    result = reconcile_subsequence(subsequence, superset, 3)
+
+    assert result == expected, f"Expected {expected}, but got {result}"
+
+    subsequence = ["line 1", "foo", "line 3", "line 4"]
+    superset = [
+        "line 1",
+        "line 2",
+        "line 3",
+        "line 4",
+    ]
+
+    expected = ["line 1", "line 2", "line 3", "line 4"]
+    result = reconcile_subsequence(subsequence, superset, 3)
+
+    assert result == expected, f"Expected {expected}, but got {result}"
+
+
+def test_reconcile_subsequence_with_extra_new_line() -> None:
+    subsequence = """\
+def func():
+    pass
+
+"""
+    superset = """\
+def func():
+    pass
 """
 
-import starlette.testclient
+    expected = """\
+def func():
+    pass
+"""
 
-
-def test_read_root(client: starlette.testclient.TestClient) -> None:
-    """Test that the root path can be read."""
-
-    # GIVEN the root path
-    path = "/"
-
-    # WHEN calling the api
-    response = client.get(path)
-
-    # THEN status_code should be 200
-    assert response.status_code == 200
-
-
-def test_addition(client: starlette.testclient.TestClient) -> None:
-    """Test that the addition endpoint correctly sums two numbers."""
-
-    # GIVEN the addition path and two numbers to sum
-    path = "/v1/maths/addition"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the sum should be 5
-    assert response.json().get("result") == 5
-
-
-def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-    """Test that the division endpoint returns a 400 when dividing by 0."""
-
-    # GIVEN the division path and two numbers to divide
-    path = "/v1/maths/division"
-    body = {"number1": 2, "number2": 0}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the status code should be 400 (Bad request)
-    assert response.status_code == 400
-''',
+    result = reconcile_subsequence(
+        subsequence.splitlines(keepends=True), superset.splitlines(keepends=True), 3
     )
 
-    expected = File(
-        path="tests/test_api.py",
-        content='''\
-"""Examples testing the api using the starlette TestClient.
+    assert result == expected.splitlines(
+        keepends=True
+    ), f"Expected {expected}, but got {result}"
 
-The test fixture "client" is defined in conftest.py
-These tests are trivial examples, they are not meant as an introduction to
-proper testing.
 
-Read more about testing in the FastAPI docs:
-https://fastapi.tiangolo.com/tutorial/testing/
+def test_reconcile_subsequence_with_non_existing_line() -> None:
+    subsequence = """\
+def func1():
+    pass
+
+foo
+def func2():
+    pass
+"""
+    superset = """\
+def func1():
+    pass
+
+def func2():
+    pass
 """
 
-import starlette.testclient
+    expected = """\
+def func1():
+    pass
+
+def func2():
+    pass
+"""
+
+    result = reconcile_subsequence(
+        subsequence.splitlines(keepends=True), superset.splitlines(keepends=True), 3
+    )
+
+    assert result == expected.splitlines(
+        keepends=True
+    ), f"Expected {expected}, but got {result}"
 
 
-def test_read_root(client: starlette.testclient.TestClient) -> None:
-    """Test that the root path can be read."""
+def test_case_for_missing_suffix_context(code_editor: CodeEditor) -> None:
+    file = File(
+        path="file.py",
+        content="""\
+@dataclass
+class GitHubService:
+    github_repo: Repository
 
-    # GIVEN the root path
-    path = "/"
-
-    # WHEN calling the api
-    response = client.get(path)
-
-    # THEN status_code should be 200
-    assert response.status_code == 200
-
-
-def test_addition(client: starlette.testclient.TestClient) -> None:
-    """Test that the addition endpoint correctly sums two numbers."""
-
-    # GIVEN the addition path and two numbers to sum
-    path = "/v1/maths/addition"
-    body = {"number1": 2, "number2": 3}
-
-    # WHEN calling the api
-    response = client.post(path, json=body)
-
-    # THEN the sum should be 5
-    assert response.json().get("result") == 5
+    def create_issue_comment(self, issue_number: int, body: str) -> None:
+        # TODO: handle issue not found
+        issue = self.github_repo.get_issue(number=issue_number)
+        issue.create_comment(body=body)
 
 
-def test_divide_by_zero(client: starlette.testclient.TestClient) -> None:
-    """Test that the division endpoint returns a 400 when dividing by 0."""
+class GitHubServiceException(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+""",
+    )
 
-    # GIVEN the division path and two numbers to divide
-    path = "/v1/maths/division"
-    body = {"number1": 2, "number2": 0}
+    diff = """\
+--- file.py
++++ file.py
+@@ ... @@
+     def create_issue_comment(self, issue_number: int, body: str) -> None:
+         # TODO: handle issue not found
+         issue = self.github_repo.get_issue(number=issue_number)
+         issue.create_comment(body=body)
++
++    def add_reaction_to_comment(self, reaction: str) -> None:
++        pass
++
+"""
 
-    # WHEN calling the api
-    response = client.post(path, json=body)
+    expected = File(
+        path="file.py",
+        content="""\
+@dataclass
+class GitHubService:
+    github_repo: Repository
 
-    # THEN the status code should be 400 (Bad request)
-    assert response.status_code == 400
+    def create_issue_comment(self, issue_number: int, body: str) -> None:
+        # TODO: handle issue not found
+        issue = self.github_repo.get_issue(number=issue_number)
+        issue.create_comment(body=body)
 
-def test_exponentiation(client: starlette.testclient.TestClient) -> None:
-    """Test that the exponentiation endpoint correctly calculates the power of a number."""
-    response = client.post("/exponentiation", json={"number1": 2, "number2": 3})
-    assert response.status_code == 200
-    assert response.json() == {"result": 8}
+    def add_reaction_to_comment(self, reaction: str) -> None:
+        pass
 
 
-''',
+
+class GitHubServiceException(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+""",
     )
 
     assert code_editor.apply_diff(diff, file) == expected

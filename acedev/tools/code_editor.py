@@ -18,6 +18,13 @@ class CodeEditor:
         file_content = file.content
         hunks = split_diff_into_hunks(diff)
         for hunk in hunks:
+            before, after = split_hunk_to_before_after(hunk.splitlines(keepends=True))
+            updated_file = find_and_replace(file_content, before, after)
+
+            if updated_file != file_content:
+                file_content = updated_file
+                continue
+
             norm_diff_lines = normalize_diff(hunk.splitlines(keepends=True), file.path)
             norm_diff = "".join(norm_diff_lines)
             updated_file = run_patch_cli(file.path, file_content, norm_diff)
@@ -73,9 +80,6 @@ def run_patch_cli(file_path: str, file_content: str, norm_diff: str) -> Optional
         return patched_content
     else:
         logger.error(f"Failed to apply patch: {process.stdout}")
-        # raise CodeEditorException(
-        #     f"Failed to apply diff to {file_path}: {process.stdout}"
-        # )
         return None
 
 
@@ -106,23 +110,14 @@ def split_diff_into_hunks(diff: str) -> list[str]:
 def fix_hunk(
     hunk_lines: list[str], filename: str, file_content_lines: list[str]
 ) -> str:
-    hunk_lines = add_suffix_context(hunk_lines, file_content_lines)
-    before_lines, after_lines = split_hunk_to_before_after(hunk_lines, as_lines=True)
-    before_lines = remove_non_existing_lines(before_lines, file_content_lines)
-    before_lines = add_missing_lines(before_lines, file_content_lines)
-    diff_lines = unified_diff(before_lines, after_lines, filename)
-
-    for idx, line in enumerate(diff_lines):
-        if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
-            continue
-        if line.startswith("-") and line not in hunk_lines:
-            logger.warning(
-                f"Removed line not found in original hunk: {line}. Leaving it in the diff."
-            )
-            diff_lines[idx] = " " + line[1:]
-
-    diff_lines = normalize_diff(diff_lines, filename)
-    return "".join(diff_lines)
+    original_before, original_after = split_hunk_to_before_after(hunk_lines, as_lines=True)
+    reconciled_before = reconcile_subsequence(original_before, file_content_lines)
+    # dirty because might remove lines that are not supposed to be removed
+    dirty_diff = unified_diff(reconciled_before, original_after, filename)
+    reconciled_diff = reconcile_diffs(dirty_diff, hunk_lines)
+    reconciled_before, reconciled_after = split_hunk_to_before_after(reconciled_diff, as_lines=True)
+    reconciled_hunk = unified_diff(reconciled_before, reconciled_after, filename)
+    return "".join(reconciled_hunk)
 
 
 def normalize_diff(diff_lines: list[str], filename: str) -> list[str]:
@@ -134,8 +129,8 @@ def normalize_diff(diff_lines: list[str], filename: str) -> list[str]:
 def split_hunk_to_before_after(
     hunk_lines: list[str], as_lines: bool = False
 ) -> tuple[list[str], list[str]] | tuple[str, str]:
-    before = []
-    after = []
+    before: list[str] = []
+    after: list[str] = []
 
     for line in hunk_lines:
         if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
@@ -170,67 +165,6 @@ def split_hunk_to_before_after(
     return "".join(before), "".join(after)
 
 
-def remove_non_existing_lines(
-    content_lines: list[str], existing_content_lines: list[str]
-) -> list[str]:
-    result = []
-    current_line_number = None
-    for line in content_lines:
-        if line in existing_content_lines:
-            current_line_number = existing_content_lines.index(line)
-            break
-
-    if current_line_number is None:
-        logger.warning(
-            f"None of the lines in Before block found in existing content. \
-            Dropping these lines: {content_lines}"
-        )
-        return result
-
-    for idx, line in enumerate(content_lines):
-        if current_line_number >= len(existing_content_lines):
-            logger.warning(
-                f"Reached end of file while removing non existing lines from Before block. \
-                Dropping these lines: {content_lines[idx:]}"
-            )
-            break
-
-        if line == existing_content_lines[current_line_number]:
-            result.append(line)
-            current_line_number += 1
-        else:
-            logger.warning(f"Line not found in existing content: {line}")
-            if line in existing_content_lines[current_line_number:]:
-                content_lines.append(line)
-                current_line_number += 1
-
-    return result
-
-
-def add_missing_lines(
-    content_lines: list[str], existing_content_lines: list[str]
-) -> list[str]:
-    current_line_number = existing_content_lines.index(content_lines[0])
-
-    for idx, line in enumerate(content_lines):
-        if current_line_number >= len(existing_content_lines):
-            logger.warning(
-                f"Reached end of file while adding missing lines to Before block. \
-                Dropping these lines: {content_lines[idx:]}"
-            )
-            break
-
-        if line != existing_content_lines[current_line_number]:
-            logger.warning(
-                f"Found missing line: {existing_content_lines[current_line_number]}"
-            )
-            content_lines.insert(idx, existing_content_lines[current_line_number])
-
-        current_line_number += 1
-
-    return content_lines
-
-
 def unified_diff(
     before_lines: list[str], after_lines: list[str], filename: str
 ) -> list[str]:
@@ -245,23 +179,75 @@ def unified_diff(
     )
 
 
-def add_suffix_context(diff_lines: list[str], file_lines: list[str]) -> list[str]:
-    if diff_lines[-1].startswith(" "):
-        return diff_lines
+def reconcile_subsequence(subsequence: list[str], superset: list[str], extra_lines: int = 3) -> list[str]:
+    """
+    Reconciles a subsequence of text with the original superset of lines.
+    
+    Args:
+        subsequence (list[str]): The subsequence to evaluate.
+        superset (list[str]): The original superset of lines.
+    
+    Returns:
+        list[str]: The reconciled subsequence.
+    """
+    reconciled: list[str] = []
+    superset_index = 0
+    subsequence_index = 0
 
-    last_existing_line = ""
-    for line in diff_lines:
-        if (line.startswith(" ") or line.startswith("-")) and line.strip():
-            last_existing_line = line[1:]
+    while subsequence_index < len(subsequence) and superset_index < len(superset):
+        if subsequence[subsequence_index] == superset[superset_index]:
+            reconciled.append(subsequence[subsequence_index])
+            subsequence_index += 1
+            superset_index += 1
+        elif subsequence[subsequence_index] in superset[superset_index:]:
+            # If the current line in subsequence exists further in the superset,
+            # add missing lines from the superset to the reconciled list
+            next_correct_index = superset.index(subsequence[subsequence_index], superset_index)
+            reconciled.extend(superset[superset_index:next_correct_index])
+            superset_index = next_correct_index
+        else:
+            # Remove non-existing lines from the subsequence
+            subsequence_index += 1
 
-    last_existing_line_index = file_lines.index(last_existing_line)
+    # Add any remaining lines from the superset to the reconciled list
+    if superset_index < len(superset):
+        reconciled.extend(superset[superset_index : superset_index + extra_lines])
 
-    if last_existing_line_index != len(file_lines) - 1:
-        diff_lines.extend(
-            " " + line
-            for line in file_lines[
-                last_existing_line_index + 1 : last_existing_line_index + 4
-            ]
-        )
+    return reconciled
 
-    return diff_lines
+
+def reconcile_diffs(current_diff: list[str], original_diff: list[str]) -> list[str]:
+    """
+    Takes two unified diffs and converts removed lines from the first one into unchanged if they are not removed in the second one as well.
+
+    Args:
+        current_diff (list[str]): The current unified diff list.
+        original_diff (list[str]): The original unified diff list.
+
+    Returns:
+        list[str]: The reconciled unified diff.
+    """
+    reconciled_diff: list[str] = []
+    for line in current_diff:
+        if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
+            reconciled_diff.append(line)
+        elif line.startswith('-') and not line in original_diff:
+            reconciled_diff.append(" " + line[1:])
+        else:
+            reconciled_diff.append(line)
+    return reconciled_diff
+
+
+def find_and_replace(file_content: str, old_text: str, new_text: str) -> str:
+    """
+    Finds and replaces all occurrences of old_text with new_text in the given file_content.
+
+    Args:
+        file_content (str): The content of the file as a string.
+        old_text (str): The text to be replaced.
+        new_text (str): The text to replace with.
+
+    Returns:
+        str: The updated file content with all occurrences of old_text replaced by new_text.
+    """
+    return file_content.replace(old_text, new_text)
