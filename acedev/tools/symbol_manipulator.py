@@ -4,7 +4,7 @@ from typing import Sequence, Optional
 
 from tree_sitter import Parser, Language, Node, Tree
 
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
 from acedev.service.model import File, Symbol
 
 CLASS_CAPTURE = "class"

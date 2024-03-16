@@ -2,11 +2,13 @@ from unittest.mock import create_autospec
 
 import pytest
 
+from acedev.agent.coding_agent import CodingAgent
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
 from acedev.service.model import Symbol
-from acedev.service.symbol_manipulator import SymbolManipulator
-from acedev.service.tool_provider import ToolProvider
+from acedev.tools.code_editor import CodeEditor
+from acedev.tools.symbol_manipulator import SymbolManipulator
+from acedev.tools.tool_provider import ToolProvider
 
 
 @pytest.fixture
@@ -27,12 +29,26 @@ def symbol_manipulator() -> SymbolManipulator:
 
 
 @pytest.fixture
+def code_editor() -> CodeEditor:
+    return create_autospec(CodeEditor)
+
+
+@pytest.fixture
+def coding_agent() -> CodingAgent:
+    return create_autospec(CodingAgent)
+
+
+@pytest.fixture
 def tool_provider(
     git_repository: GitRepository,
     github_service: GitHubService,
     symbol_manipulator: SymbolManipulator,
+    code_editor: CodeEditor,
+    coding_agent: CodingAgent,
 ) -> ToolProvider:
-    return ToolProvider(git_repository, github_service, symbol_manipulator)
+    return ToolProvider(
+        git_repository, github_service, symbol_manipulator, code_editor, coding_agent
+    )
 
 
 def test_get_default_branch(

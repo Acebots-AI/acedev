@@ -4,7 +4,8 @@ from acedev.agent import AgentRunner
 from acedev.agent.github_agent import GitHubAgent
 from acedev.agent.github_agent_factory import GitHubAgentFactory
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
+from acedev.service.openai_service import OpenAIService
 
 
 def test_create() -> None:
@@ -15,6 +16,7 @@ def test_create() -> None:
             git_repo=mock_git_repo,
             github_service=create_autospec(spec=GitHubService),
             agent_runner=create_autospec(spec=AgentRunner),
+            openai_service=create_autospec(spec=OpenAIService),
         ),
         GitHubAgent,
     )

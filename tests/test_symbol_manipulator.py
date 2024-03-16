@@ -3,9 +3,9 @@ from unittest.mock import create_autospec
 import pytest
 from tree_sitter_languages import get_parser, get_language
 
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
 from acedev.service.model import File, Symbol
-from acedev.service.symbol_manipulator import (
+from acedev.tools.symbol_manipulator import (
     SymbolManipulator,
     SymbolManipulatorException,
 )

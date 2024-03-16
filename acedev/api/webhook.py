@@ -13,9 +13,11 @@ from acedev.api.dependencies import (
     get_ghe_client,
     get_openai_agent,
     get_github_agent_factory,
+    get_openai_service,
 )
 from acedev.service.github_service import GitHubService
-from acedev.service.gitrepository import GitRepository
+from acedev.service.git_repository import GitRepository
+from acedev.service.openai_service import OpenAIService
 
 router = fastapi.APIRouter()
 logger = logging.getLogger(__name__)
@@ -132,6 +134,7 @@ def webhook(
     ghe_client: GithubIntegration = Depends(get_ghe_client),
     openai_agent: OpenAIAgentRunner = Depends(get_openai_agent),
     github_agent_factory: GitHubAgentFactory = Depends(get_github_agent_factory),
+    openai_service: OpenAIService = Depends(get_openai_service),
 ) -> fastapi.Response:
     logger.info(f"Received {x_github_event=}")
     logger.debug(f"{payload=}")
@@ -151,6 +154,7 @@ def webhook(
                     ghe_client,
                     openai_agent,
                     github_agent_factory,
+                    openai_service,
                 )
         case "issue_comment":
             issue_comment = IssueCommentPayload(**payload)
@@ -167,6 +171,7 @@ def webhook(
                     ghe_client,
                     openai_agent,
                     github_agent_factory,
+                    openai_service,
                 )
         case "issues":
             if payload.get("action", None) == "assigned":
@@ -179,6 +184,7 @@ def webhook(
                         ghe_client,
                         openai_agent,
                         github_agent_factory,
+                        openai_service,
                     )
         case _:
             logger.warning(f"Unexpected event: {x_github_event}")
@@ -191,6 +197,7 @@ def handle_pull_request_review_comment(
     github_client: GithubIntegration,
     openai_agent: OpenAIAgentRunner,
     github_agent_factory: GitHubAgentFactory,
+    openai_service: OpenAIService,
 ) -> None:
     try:
         github_repo = github_client.get_github_for_installation(
@@ -201,6 +208,7 @@ def handle_pull_request_review_comment(
             git_repo=GitRepository(github_repo),
             github_service=GitHubService(github_repo),
             agent_runner=openai_agent,
+            openai_service=openai_service,
         )
 
         github_agent.handle_pull_request_review_comment(
@@ -216,6 +224,7 @@ def handle_issue_comment(
     github_client: GithubIntegration,
     openai_agent: OpenAIAgentRunner,
     github_agent_factory: GitHubAgentFactory,
+        openai_service: OpenAIService,
 ) -> None:
     try:
         github_repo = github_client.get_github_for_installation(
@@ -226,6 +235,7 @@ def handle_issue_comment(
             git_repo=GitRepository(github_repo),
             github_service=GitHubService(github_repo),
             agent_runner=openai_agent,
+            openai_service=openai_service,
         )
 
         github_agent.handle_issue_comment(
@@ -240,6 +250,7 @@ def handle_assigned_issue(
     github_client: GithubIntegration,
     openai_agent: OpenAIAgentRunner,
     github_agent_factory: GitHubAgentFactory,
+    openai_service: OpenAIService,
 ) -> None:
     try:
         github_repo = github_client.get_github_for_installation(
@@ -250,6 +261,7 @@ def handle_assigned_issue(
             git_repo=GitRepository(github_repo),
             github_service=GitHubService(github_repo),
             agent_runner=openai_agent,
+            openai_service=openai_service,
         )
 
         github_agent.handle_issue_assignment(
