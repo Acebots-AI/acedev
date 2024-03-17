@@ -133,6 +133,9 @@ def split_hunk_to_before_after(
     after: list[str] = []
 
     for line in hunk_lines:
+        if not line.endswith("\n"):
+            line += "\n"
+
         if line.startswith("---") or line.startswith("+++") or line.startswith("@@"):
             continue
 
