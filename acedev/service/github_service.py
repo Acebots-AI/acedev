@@ -98,6 +98,14 @@ class GitHubService:
         # TODO: handle issue not found
         issue = self.github_repo.get_issue(number=issue_number)
         issue.create_comment(body=body)
+        
+    def add_reaction_to_comment(self, comment_url: str, reaction: str) -> None:
+        # Extract the comment ID from the URL
+        comment_id = comment_url.split('/')[-1]
+        # Use the Repository object to create a reaction for the comment
+        comment = self.github_repo.get_issue_comment(int(comment_id))
+        comment.create_reaction(reaction)
+
 
 
 class GitHubServiceException(Exception):
