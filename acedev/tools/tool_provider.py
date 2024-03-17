@@ -3,7 +3,7 @@ import string
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from acedev.agent.coding_agent import CodingAgent
+from acedev.agent.coding_agent import CodingAgent, CodingAgentException
 from acedev.service.github_service import GitHubService, GitHubServiceException
 from acedev.service.git_repository import GitRepository, GitRepositoryException
 from acedev.service.model import File
@@ -271,7 +271,7 @@ class ToolProvider:
 
             self.git_repository.update_file(file=new_file, branch=branch)
             return f"Edited {path}. The new file content is:\n\n{new_file.content}"
-        except GitRepositoryException as e:
+        except (GitRepositoryException, CodingAgentException) as e:
             return f"Failed to edit {path} in {branch}: {e.message}"
 
     def code_understanding_tools(self) -> dict[str, Callable[..., str]]:
