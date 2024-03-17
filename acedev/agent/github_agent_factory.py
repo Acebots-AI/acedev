@@ -34,6 +34,7 @@ class GitHubAgentFactory:
             openai_service=openai_service,
             model="gpt-4-turbo-preview",
             temperature=0,
+            max_retries=3
         )
 
         tool_provider = ToolProvider(
