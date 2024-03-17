@@ -15,8 +15,8 @@ from acedev.api.dependencies import (
     get_github_agent_factory,
     get_openai_service,
 )
-from acedev.service.github_service import GitHubService
 from acedev.service.git_repository import GitRepository
+from acedev.service.github_service import GitHubService
 from acedev.service.openai_service import OpenAIService
 
 router = fastapi.APIRouter()
@@ -224,7 +224,7 @@ def handle_issue_comment(
     github_client: GithubIntegration,
     openai_agent: OpenAIAgentRunner,
     github_agent_factory: GitHubAgentFactory,
-        openai_service: OpenAIService,
+    openai_service: OpenAIService,
 ) -> None:
     try:
         github_repo = github_client.get_github_for_installation(
