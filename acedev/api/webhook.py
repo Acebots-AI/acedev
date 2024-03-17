@@ -194,6 +194,8 @@ def webhook(
 
 def handle_pull_request_review_comment(
     payload: PullRequestReviewCommentPayload,
+def handle_issue_comment(
+    payload: IssueCommentPayload,
     github_client: GithubIntegration,
     openai_agent: OpenAIAgentRunner,
     github_agent_factory: GitHubAgentFactory,
@@ -210,6 +212,9 @@ def handle_pull_request_review_comment(
             agent_runner=openai_agent,
             openai_service=openai_service,
         )
+
+        if payload.comment.body.startswith(f"@{ACEDEV_USERNAME}"):
+            github_service.add_reaction_to_comment(payload.comment.html_url, 'eyes')
 
         github_agent.handle_pull_request_review_comment(
             comment_id=payload.comment.id,
