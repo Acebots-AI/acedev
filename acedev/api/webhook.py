@@ -231,6 +231,8 @@ def handle_issue_comment(
             payload.installation.id
         ).get_repo(payload.repository.full_name)
 
+        print("Hello world!")
+
         github_agent = github_agent_factory.create(
             git_repo=GitRepository(github_repo),
             github_service=GitHubService(github_repo),
