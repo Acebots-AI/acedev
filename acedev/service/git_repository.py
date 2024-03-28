@@ -38,8 +38,9 @@ class GitRepository:
     @staticmethod
     def determine_default_language(github_repo: Repository) -> Optional[str]:
         languages = github_repo.get_languages()
-        if languages:
-            return max(languages, key=languages.get).lower()
+        if not languages:
+            return None
+        return max(languages, key=languages.get).lower()
         return None
 
     def __repr__(self) -> str:
