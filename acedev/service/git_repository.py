@@ -37,16 +37,9 @@ class GitRepository:
 
     @staticmethod
     def determine_default_language(github_repo: Repository) -> Optional[str]:
-        if github_repo.language:
-            return github_repo.language.lower()
-        elif github_repo.languages and len(github_repo.languages) > 0:
-            # Assuming github_repo.languages is a list or dict of languages
-            # If it's a dict, take the most used language as default
-            if isinstance(github_repo.languages, dict):
-                return max(github_repo.languages, key=github_repo.languages.get).lower()
-            # If it's a list, take the first language as default
-            elif isinstance(github_repo.languages, list):
-                return github_repo.languages[0].lower()
+        languages = github_repo.get_languages()
+        if languages:
+            return max(languages, key=languages.get).lower()
         return None
 
     def __repr__(self) -> str:
