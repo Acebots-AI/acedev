@@ -33,8 +33,13 @@ class GitRepository:
         self.github_repo = github_repo
         self.default_branch = github_repo.default_branch
         self.full_name = github_repo.full_name
-        self.language = (github_repo.language or
-                         max(github_repo.get_languages(), key=github_repo.get_languages().get)).lower()
+        self.language = self.determine_default_language(github_repo)
+
+    @staticmethod
+    def determine_default_language(github_repo: Repository) -> Optional[str]:
+        languages = github_repo.get_languages()
+        return max(languages, key=languages.get).lower()
+        return None
 
     def __repr__(self) -> str:
         return f"Project({self.full_name})"
