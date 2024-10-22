@@ -6,7 +6,7 @@ authors = ["Art Moskvin <amoskvin@me.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.13"
 pydantic = "^2.5.3"
 jinja2 = "^3.1.2"
 pygithub = "^2.1.1"
@@ -20,6 +20,7 @@ litellm = "^1.23.14"
 numpydoc = "^1.6.0"
 pytest = "^8.0.2"
 diff-match-patch = "^20230430"
+replit-object-storage = "^1.0.2"
 
 
 [build-system]

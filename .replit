@@ -1,0 +1,15 @@
+modules = ["python-3.10"]
+run = "poetry run uvicorn acedev.main:main --host 0.0.0.0 --port 80"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "poetry run uvicorn acedev.main:main --host 0.0.0.0 --port 80"]
+
+[objectStorage]
+defaultBucketID = "replit-objstore-feb62ca7-2afe-4e0c-a855-157dd9b4c4c0"
+
+[[ports]]
+localPort = 80
+externalPort = 80

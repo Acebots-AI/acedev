@@ -3,6 +3,7 @@ import os
 
 from dotenv import load_dotenv
 from github import Auth, GithubIntegration
+from replit.object_storage import Client
 
 from acedev.agent.github_agent_factory import GitHubAgentFactory
 from acedev.api.api import get_api
@@ -15,9 +16,11 @@ logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
 load_dotenv()
 
+c = Client()
+
 auth = Auth.AppAuth(
     app_id=int(os.environ["GITHUB_APP_ID"]),
-    private_key=os.environ["GITHUB_APP_PRIVATE_KEY"],
+    private_key=c.download_as_text("hide-app.2024-10-21.private-key.pem"),
 )
 
 ghe_client = GithubIntegration(
@@ -27,7 +30,7 @@ ghe_client = GithubIntegration(
 github_agent_factory = GitHubAgentFactory()
 openai_service = OpenAIService()
 openai_agent = OpenAIAgentRunner(
-    model="gpt-4-turbo-preview", temperature=0.0, openai_service=openai_service
+    model="gpt-4o", temperature=0.0, openai_service=openai_service
 )
 
 main = get_api(
